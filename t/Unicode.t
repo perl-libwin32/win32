@@ -8,7 +8,7 @@ BEGIN {
 	print "1..0 # Skip: Needs ActivePerl 820 or Perl 5.8.9 or later\n";
 	exit 0;
     }
-    unless ((Win32::FsType())[1] & 4) {
+    if ((((Win32::FsType())[1] & 4) == 0) || (Win32::FsType() =~ /^FAT/)) {
 	print "1..0 # Skip: Filesystem doesn't support Unicode\n";
 	exit 0;
     }
@@ -60,8 +60,8 @@ ok($long, Win32::GetLongPathName($home)."\\$dir");
 
 # We can Win32::SetCwd() into the Unicode directory
 ok(Win32::SetCwd($dir));
-ok(Win32::GetLongPathName(Win32::GetCwd()), $long);
 
+my $w32dir = Win32::GetCwd();
 # cwd() also returns a usable ANSI directory name
 my $subdir = cwd();
 
@@ -70,11 +70,12 @@ my $subdir = cwd();
 ok(chdir($home));
 ok(Win32::GetCwd(), $home);
 
+ok(Win32::GetLongPathName($w32dir), $long);
+
 # cwd() on Cygwin returns a mapped path that we need to translate
 # back to a Windows path. Invoking `cygpath` on $subdir doesn't work.
 if ($^O eq "cygwin") {
-    chomp(my $cygpath = `cygpath -w "$cwd"`);
-    $subdir =~ s,\Q$cwd\E,$cygpath,;
+    $subdir = Cygwin::posix_to_win_path($subdir, 1);
 }
 $subdir =~ s,/,\\,g;
 ok(Win32::GetLongPathName($subdir), $long);
