@@ -1,0 +1,14 @@
+Changes
+MANIFEST
+META.yml
+Makefile.PL
+README
+Win32.pm
+Win32.xs
+t/ExpandEnvironmentStrings.t
+t/GetFileVersion.t
+t/GetFolderPath.t
+t/GetFullPathName.t
+t/GetLongPathName.t
+t/GetOSVersion.t
+t/GuidGen.t
