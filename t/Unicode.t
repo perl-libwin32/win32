@@ -13,6 +13,10 @@ BEGIN {
 	print "1..0 # Skip: Filesystem doesn't support Unicode\n";
 	exit 0;
     }
+    unless ((Win32::GetOSVersion())[1] > 4) {
+	print "1..0 # Skip: Unicode support requires Windows 2000 or later\n";
+	exit 0;
+    }
 }
 
 my $home = Win32::GetCwd();

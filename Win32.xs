@@ -103,6 +103,12 @@ IsWinNT(void)
     return (g_osver.dwPlatformId == VER_PLATFORM_WIN32_NT);
 }
 
+int
+IsWin2000(void)
+{
+    return (g_osver.dwMajorVersion > 4);
+}
+
 /* Convert SV to wide character string.  The return value must be
  * freed using Safefree().
  */
@@ -301,7 +307,7 @@ get_childdir(void)
     dTHX;
     char* ptr;
 
-    if (IsWinNT()) {
+    if (IsWin2000()) {
         WCHAR filename[MAX_PATH+1];
         GetCurrentDirectoryW(MAX_PATH+1, filename);
         ptr = my_ansipath(filename);
@@ -344,7 +350,7 @@ XS(w32_ExpandEnvironmentStrings)
     if (items != 1)
 	croak("usage: Win32::ExpandEnvironmentStrings($String);\n");
 
-    if (IsWinNT()) {
+    if (IsWin2000()) {
         WCHAR value[31*1024];
         WCHAR *source = sv_to_wstr(aTHX_ ST(0));
         ExpandEnvironmentStringsW(source, value, countof(value)-1);
@@ -639,7 +645,7 @@ XS(w32_MsgBox)
     if (items > 1)
         flags = SvIV(ST(1));
 
-    if (IsWinNT()) {
+    if (IsWin2000()) {
         WCHAR *title = NULL;
         WCHAR *msg = sv_to_wstr(aTHX_ ST(0));
         if (items > 2)
@@ -789,7 +795,7 @@ XS(w32_GetFolderPath)
     module = LoadLibrary("shfolder.dll");
     if (module) {
         PFNSHGetFolderPathA pfna;
-        if (IsWinNT()) {
+        if (IsWin2000()) {
             PFNSHGetFolderPathW pfnw;
             pfnw = (PFNSHGetFolderPathW)GetProcAddress(module, "SHGetFolderPathW");
             if (pfnw && SUCCEEDED(pfnw(NULL, folder|create, NULL, 0, wpath))) {
@@ -809,7 +815,7 @@ XS(w32_GetFolderPath)
     module = LoadLibrary("shell32.dll");
     if (module) {
         PFNSHGetSpecialFolderPathA pfna;
-        if (IsWinNT()) {
+        if (IsWin2000()) {
             PFNSHGetSpecialFolderPathW pfnw;
             pfnw = (PFNSHGetSpecialFolderPathW)GetProcAddress(module, "SHGetSpecialFolderPathW");
             if (pfnw && pfnw(NULL, wpath, folder, !!create)) {
@@ -830,7 +836,7 @@ XS(w32_GetFolderPath)
      * Perl versions that have replaced the Unicode environment with an
      * ANSI version.  Let's go spelunking in the registry now...
      */
-    if (IsWinNT()) {
+    if (IsWin2000()) {
         SV *sv;
         HKEY hkey;
         HKEY root = HKEY_CURRENT_USER;
@@ -1023,7 +1029,7 @@ XS(w32_SetCwd)
     if (items != 1)
 	Perl_croak(aTHX_ "usage: Win32::SetCwd($cwd)");
 
-    if (IsWinNT() && SvUTF8(ST(0))) {
+    if (IsWin2000() && SvUTF8(ST(0))) {
         WCHAR *wide = sv_to_wstr(aTHX_ ST(0));
         char *ansi = my_ansipath(wide);
         int rc = PerlDir_chdir(ansi);
@@ -1077,7 +1083,7 @@ XS(w32_LoginName)
 {
     dXSARGS;
     EXTEND(SP,1);
-    if (IsWinNT()) {
+    if (IsWin2000()) {
         WCHAR name[128];
         DWORD size = countof(name);
         if (GetUserNameW(name, &size)) {
@@ -1314,7 +1320,7 @@ XS(w32_GetShortPathName)
     if (items != 1)
 	Perl_croak(aTHX_ "usage: Win32::GetShortPathName($longPathName)");
 
-    if (IsWinNT()) {
+    if (IsWin2000()) {
         WCHAR wshort[MAX_PATH+1];
         WCHAR *wlong = sv_to_wstr(aTHX_ ST(0));
         len = GetShortPathNameW(wlong, wshort, countof(wshort));
@@ -1359,7 +1365,7 @@ XS(w32_GetFullPathName)
 	Perl_croak(aTHX_ "usage: Win32::GetFullPathName($filename)");
 
 #if __CYGWIN__
-    if (IsWinNT()) {
+    if (IsWin2000()) {
         WCHAR *filename = sv_to_wstr(aTHX_ ST(0));
         WCHAR full[2*MAX_PATH];
         DWORD len = GetFullPathNameW(filename, countof(full), full, NULL);
@@ -1384,7 +1390,7 @@ XS(w32_GetFullPathName)
      * XXX The one missing case is where we could downgrade $filename
      * XXX from UTF8 into the current codepage.
      */
-    if (IsWinNT() && SvUTF8(ST(0))) {
+    if (IsWin2000() && SvUTF8(ST(0))) {
         WCHAR *filename = sv_to_wstr(aTHX_ ST(0));
         WCHAR *mappedname = PerlDir_mapW(filename);
         Safefree(filename);
@@ -1406,8 +1412,23 @@ XS(w32_GetFullPathName)
 #  endif
 #endif
 
+    /* GetFullPathName() on Windows NT drops trailing backslash */
+    if (g_osver.dwMajorVersion == 4 && *fullname) {
+        STRLEN len;
+        char *pv = SvPV(ST(0), len);
+        char *lastchar = fullname + strlen(fullname) - 1;
+        /* If ST(0) ends with a slash, but fullname doesn't ... */
+        if (len && (pv[len-1] == '/' || pv[len-1] == '\\') && *lastchar != '\\') {
+            /* fullname is the MAX_PATH+1 sized buffer returned from PerlDir_mapA()
+             * or the 2*MAX_PATH sized local buffer in the __CYGWIN__ case.
+             */
+            strcpy(lastchar+1, "\\");
+        }
+    }
+
     if (GIMME_V == G_ARRAY) {
         char *filepart = strrchr(fullname, '\\');
+
         EXTEND(SP,1);
         if (filepart) {
             XST_mPV(1, ++filepart);
@@ -1432,7 +1453,7 @@ XS(w32_GetLongPathName)
     if (items != 1)
 	Perl_croak(aTHX_ "usage: Win32::GetLongPathName($pathname)");
 
-    if (IsWinNT()) {
+    if (IsWin2000()) {
         WCHAR *wstr = sv_to_wstr(aTHX_ ST(0));
         WCHAR wide_path[MAX_PATH+1];
         WCHAR *long_path;
@@ -1533,7 +1554,7 @@ XS(w32_CreateDirectory)
     if (items != 1)
 	Perl_croak(aTHX_ "usage: Win32::CreateDirectory($dir)");
 
-    if (IsWinNT() && SvUTF8(ST(0))) {
+    if (IsWin2000() && SvUTF8(ST(0))) {
         WCHAR *dir = sv_to_wstr(aTHX_ ST(0));
         result = CreateDirectoryW(dir, NULL);
         Safefree(dir);
@@ -1554,7 +1575,7 @@ XS(w32_CreateFile)
     if (items != 1)
 	Perl_croak(aTHX_ "usage: Win32::CreateFile($file)");
 
-    if (IsWinNT() && SvUTF8(ST(0))) {
+    if (IsWin2000() && SvUTF8(ST(0))) {
         WCHAR *file = sv_to_wstr(aTHX_ ST(0));
         handle = CreateFileW(file, GENERIC_WRITE, FILE_SHARE_WRITE,
                              NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);

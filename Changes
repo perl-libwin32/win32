@@ -1,6 +1,13 @@
 Revision history for the Perl extension Win32.
 
-0.27_01	[2007-04-12]
+0.27_02	[2007-05-11]
+	- We need Windows 2000 or later for the Unicode support because
+	  WC_NO_BEST_FIT_CHARS is not supported on Windows NT.
+
+	- Fix Win32::GetFullPathName() on Windows NT to return an
+	  empty file part if the original argument ends with a slash.
+
+0.27_01	[2007-04-18]
 	- Update Win32::IsAdminUser() to use the IsUserAnAdmin() function
 	  in shell32.dll when available.  On Windows Vista this will only
 	  return true if the process is running with elevated privileges
