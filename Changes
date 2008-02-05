@@ -1,5 +1,8 @@
 Revision history for the Perl extension Win32.
 
+0.29	[2007-05-17]
+	- Fixed to compile with Borland BCC (thanks to Stave Hay).
+
 0.28_01	[2007-05-16]
 	- Increase version number as 0.28 was already used by an ActivePerl
 	  release (for essentially 0.27 plus the Win32::IsAdminUser() change).
