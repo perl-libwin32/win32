@@ -1,5 +1,11 @@
 Revision history for the Perl extension Win32.
 
+0.33	[2007-11-12]
+	- Update version to 0.33 for Perl 5.10 release
+	- Add $^O test in Makefile.PL for CPAN Testers
+	- Use Win32::GetLastError() instead of $^E in t/Names.t for
+	  cygwin compatibility (Jerry D. Hedden).
+
 0.32	[2007-09-20]
 	- Additional #define's for older versions of VC++ (Dmitry Karasik).
 	- Win32::DomainName() doesn't return anything when the Workstation
