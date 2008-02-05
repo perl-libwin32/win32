@@ -1,5 +1,14 @@
 Revision history for the Perl extension Win32.
 
+0.32	[2007-09-20]
+	- Additional #define's for older versions of VC++ (Dmitry Karasik).
+	- Win32::DomainName() doesn't return anything when the Workstation
+	  service isn't running.  Set $^E and adapt t/Names.t accordingly
+	  (Steve Hay & Jerry D. Hedden).
+	- Fix t/Names.t to allow Win32::GetOSName() to return an empty
+	  description as the 2nd return value (e.g. Vista without SP).
+	- Fix t/GetFileVersion.t for Perl 5.10
+
 0.31	[2007-09-10]
 	- Apply Cygwin fixes from bleadperl (from Jerry D. Hedden).
 	- Make sure Win32::GetLongPathName() always returns drive
