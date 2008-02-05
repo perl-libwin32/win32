@@ -45,20 +45,32 @@ typedef BOOL (__stdcall *PFNIsUserAnAdmin)();
 
 #ifndef CSIDL_ADMINTOOLS
 #   define CSIDL_ADMINTOOLS           0x0030
-#   define CSIDL_CDBURN_AREA          0x003B
 #   define CSIDL_COMMON_ADMINTOOLS    0x002F
 #   define CSIDL_COMMON_APPDATA       0x0023
 #   define CSIDL_COMMON_DOCUMENTS     0x002E
-#   define CSIDL_COMMON_MUSIC         0x0035
-#   define CSIDL_COMMON_PICTURES      0x0036
 #   define CSIDL_COMMON_TEMPLATES     0x002D
-#   define CSIDL_COMMON_VIDEO         0x0037
 #   define CSIDL_LOCAL_APPDATA        0x001C
 #   define CSIDL_MYPICTURES           0x0027
 #   define CSIDL_PROFILE              0x0028
 #   define CSIDL_PROGRAM_FILES        0x0026
 #   define CSIDL_PROGRAM_FILES_COMMON 0x002B
 #   define CSIDL_WINDOWS              0x0024
+#endif
+
+#ifndef CSIDL_CDBURN_AREA
+#   define CSIDL_CDBURN_AREA          0x003B
+#endif
+
+#ifndef CSIDL_COMMON_MUSIC
+#   define CSIDL_COMMON_MUSIC         0x0035
+#endif
+
+#ifndef CSIDL_COMMON_PICTURES
+#   define CSIDL_COMMON_PICTURES      0x0036
+#endif
+
+#ifndef CSIDL_COMMON_VIDEO
+#   define CSIDL_COMMON_VIDEO         0x0037
 #endif
 
 #ifndef CSIDL_MYMUSIC
