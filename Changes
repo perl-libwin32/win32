@@ -1,6 +1,17 @@
 Revision history for the Perl extension Win32.
 
-0.27_02	[2007-05-11]
+0.28_01	[2007-05-16]
+	- Increase version number as 0.28 was already used by an ActivePerl
+	  release (for essentially 0.27 plus the Win32::IsAdminUser() change).
+
+	- Add MODULE and PROTOTYPES directives to silence warnings from
+	  newer versions of xsubpp.
+
+	- Use the Cygwin codepath in Win32::GetFullPathName() when
+	  PERL_IMPLICIT_SYS is not defined, because the other code
+	  relies on the virtualization code in win32/vdir.h.
+
+0.27_02	[2007-05-15]
 	- We need Windows 2000 or later for the Unicode support because
 	  WC_NO_BEST_FIT_CHARS is not supported on Windows NT.
 
