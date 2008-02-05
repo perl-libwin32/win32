@@ -1357,14 +1357,21 @@ XS(w32_GetFullPathName)
     dXSARGS;
     char *fullname;
     char *ansi = NULL;
-#if __CYGWIN__
+
+/* The code below relies on the fact that PerlDir_mapX() returns an
+ * absolute path, which is only true under PERL_IMPLICIT_SYS when
+ * we use the virtualization code from win32/vdir.h.
+ * Without it PerlDir_mapX() is a no-op and we need to use the same
+ * code as we use for Cygwin.
+ */
+#if __CYGWIN__ || !defined(PERL_IMPLICIT_SYS)
     char buffer[2*MAX_PATH];
 #endif
 
     if (items != 1)
 	Perl_croak(aTHX_ "usage: Win32::GetFullPathName($filename)");
 
-#if __CYGWIN__
+#if __CYGWIN__ || !defined(PERL_IMPLICIT_SYS)
     if (IsWin2000()) {
         WCHAR *filename = sv_to_wstr(aTHX_ ST(0));
         WCHAR full[2*MAX_PATH];
@@ -1593,9 +1600,12 @@ XS(w32_CreateFile)
     XSRETURN(1);
 }
 
-XS(boot_Win32)
+MODULE = Win32            PACKAGE = Win32
+
+PROTOTYPES: DISABLE
+
+BOOT:
 {
-    dXSARGS;
     char *file = __FILE__;
 
     if (g_osver.dwOSVersionInfoSize == 0) {

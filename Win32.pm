@@ -2,13 +2,14 @@ package Win32;
 
 BEGIN {
     use strict;
-    use vars qw|$VERSION @ISA @EXPORT @EXPORT_OK|;
+    use vars qw|$VERSION $XS_VERSION @ISA @EXPORT @EXPORT_OK|;
 
     require Exporter;
     require DynaLoader;
 
     @ISA = qw|Exporter DynaLoader|;
-    $VERSION = '0.27_02';
+    $VERSION = '0.28_01';
+    $XS_VERSION = $VERSION;
     $VERSION = eval $VERSION;
 
     @EXPORT = qw(
