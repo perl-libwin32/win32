@@ -1,0 +1,10 @@
+abstract: Interfaces to some Win32 API Functions
+author: Jan Dubois <jand@activestate.com>
+distribution_type: module
+installdirs: perl
+license: perl
+name: Win32
+requires: 
+  perl: 5.6
+version: 0.28_01
+version_from: Win32.pm
