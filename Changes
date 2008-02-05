@@ -1,0 +1,14 @@
+Revision history for the Perl extension Win32.
+
+0.27	[2007-03-07]
+	- Extracted from the libwin32 distribution to simplify maintenance
+	  because Win32 is a dual-life core module since 5.8.4.
+
+	- Win32.pm and Win32.xs updated to version in bleadperl.
+	  This includes all the Win32::* function from win32/win32.c
+	  in core Perl, except for Win32::SetChildShowWindows().
+
+	- Install into 'perl' directory instead of 'site' for Perl 5.8.4
+	  and later.
+
+	- Add some simple tests
