@@ -1,5 +1,9 @@
 Revision history for the Perl extension Win32.
 
+0.34	[2007-11-21]
+	- Document "WinVista" return value for Win32::GetOSName()
+	  (Steve Hay).
+
 0.33	[2007-11-12]
 	- Update version to 0.33 for Perl 5.10 release
 	- Add $^O test in Makefile.PL for CPAN Testers
