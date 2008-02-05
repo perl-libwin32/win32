@@ -1,5 +1,50 @@
 Revision history for the Perl extension Win32.
 
+0.27_01	[2007-04-12]
+	- Update Win32::IsAdminUser() to use the IsUserAnAdmin() function
+	  in shell32.dll when available.  On Windows Vista this will only
+	  return true if the process is running with elevated privileges
+	  and not just when the owner of the process is a member of the
+	  "Administrators" group.
+
+	- Win32::ExpandEnvironmentStrings() may return a Unicode string
+	  (a string containing characters outside the system codepage)
+
+	- new Win32::GetANSIPathName() function returns a pathname in
+	  a form containing only characters from the system codepage
+
+	- Win32::GetCwd() will return an ANSI version of the directory
+	  name if the long name contains characters outside the system
+	  codepage.
+
+	- Win32::GetFolderPath() will return an ANSI pathname. Call
+	  Win32::GetLongPathName() to get the canonical Unicode
+	  representation.
+
+	- Win32::GetFullPathName() will return an ANSI pathname. Call
+	  Win32::GetLongPathName() to get the canonical Unicode
+	  representation.
+
+	- Win32::GetLongPathName() may return a Unicode path name.
+	  Call Win32::GetANSIPathName() to get a representation using
+	  only characters from the system codepage.
+
+	- Win32::LoginName() may return a Unicode string.
+
+	- new Win32::OutputDebugString() function sends a string to
+	  the debugger.
+
+	- new Win32::GetCurrentThreadId() function returns the thread
+	  id (to complement the process id in $$).
+
+	- new Win32::CreateDirectory() creates a new directory.  The
+	  name of the directory may contain Unicode characters outside
+	  the system codepage.
+
+	- new Win32::CreateFile() creates a new file.  The name of the
+	  file may contain Unicode characters outside the system codepage.
+
+
 0.27	[2007-03-07]
 	- Extracted from the libwin32 distribution to simplify maintenance
 	  because Win32 is a dual-life core module since 5.8.4.
@@ -11,4 +56,4 @@ Revision history for the Perl extension Win32.
 	- Install into 'perl' directory instead of 'site' for Perl 5.8.4
 	  and later.
 
-	- Add some simple tests
+	- Add some simple tests.
