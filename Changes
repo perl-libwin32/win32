@@ -1,5 +1,14 @@
 Revision history for the Perl extension Win32.
 
+0.31	[2007-09-10]
+	- Apply Cygwin fixes from bleadperl (from Jerry D. Hedden).
+	- Make sure Win32::GetLongPathName() always returns drive
+	  letters in uppercase (Jerry D. Hedden).
+	- Use uppercase environment variable names in t/Unicode.t
+	  because the MSWin32 doesn't care, and Cygwin only works
+	  with the uppercased version.
+	- new t/Names.t test (from Sébastien Aperghis-Tramoni)
+
 0.30	[2007-06-25]
 	- Fixed t/Unicode.t test for Cygwin (with help from Jerry D. Hedden).
 	- Fixed and documented Win32::GetShortPathName() to return undef

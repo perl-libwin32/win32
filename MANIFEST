@@ -16,4 +16,5 @@ t/GetLongPathName.t
 t/GetOSVersion.t
 t/GetShortPathName.t
 t/GuidGen.t
+t/Names.t
 t/Unicode.t
