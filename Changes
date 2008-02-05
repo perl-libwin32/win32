@@ -1,7 +1,13 @@
 Revision history for the Perl extension Win32.
 
+0.30	[2007-06-25]
+	- Fixed t/Unicode.t test for Cygwin (with help from Jerry D. Hedden).
+	- Fixed and documented Win32::GetShortPathName() to return undef
+	  when the pathname doesn't exist (thanks to Steve Hay).
+	- Added t/GetShortPathName.t
+
 0.29	[2007-05-17]
-	- Fixed to compile with Borland BCC (thanks to Stave Hay).
+	- Fixed to compile with Borland BCC (thanks to Steve Hay).
 
 0.28_01	[2007-05-16]
 	- Increase version number as 0.28 was already used by an ActivePerl
