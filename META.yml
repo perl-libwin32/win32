@@ -14,5 +14,3 @@ meta-spec:
    version: 1.3
    url: http://module-build.sourceforge.net/META-spec-v1.3.html
 generated_by: Jan Dubois
-installdirs: perl
-version_from: Win32.pm
