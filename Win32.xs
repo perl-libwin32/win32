@@ -37,7 +37,7 @@ typedef BOOL (__stdcall *PFNAllocateAndInitializeSid)(PSID_IDENTIFIER_AUTHORITY,
                                                       DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, PSID*);
 typedef BOOL (__stdcall *PFNEqualSid)(PSID, PSID);
 typedef void* (__stdcall *PFNFreeSid)(PSID);
-typedef BOOL (__stdcall *PFNIsUserAnAdmin)();
+typedef BOOL (__stdcall *PFNIsUserAnAdmin)(void);
 
 #ifndef CSIDL_MYMUSIC
 #   define CSIDL_MYMUSIC              0x000D
@@ -1245,17 +1245,17 @@ XS(w32_GetOSVersion)
     if (GIMME_V == G_SCALAR) {
         XSRETURN_IV(g_osver.dwPlatformId);
     }
-    XPUSHs(newSVpvn(g_osver.szCSDVersion, strlen(g_osver.szCSDVersion)));
+    XPUSHs(sv_2mortal(newSVpvn(g_osver.szCSDVersion, strlen(g_osver.szCSDVersion))));
 
-    XPUSHs(newSViv(g_osver.dwMajorVersion));
-    XPUSHs(newSViv(g_osver.dwMinorVersion));
-    XPUSHs(newSViv(g_osver.dwBuildNumber));
-    XPUSHs(newSViv(g_osver.dwPlatformId));
+    XPUSHs(sv_2mortal(newSViv(g_osver.dwMajorVersion)));
+    XPUSHs(sv_2mortal(newSViv(g_osver.dwMinorVersion)));
+    XPUSHs(sv_2mortal(newSViv(g_osver.dwBuildNumber)));
+    XPUSHs(sv_2mortal(newSViv(g_osver.dwPlatformId)));
     if (g_osver_ex) {
-        XPUSHs(newSViv(g_osver.wServicePackMajor));
-        XPUSHs(newSViv(g_osver.wServicePackMinor));
-        XPUSHs(newSViv(g_osver.wSuiteMask));
-        XPUSHs(newSViv(g_osver.wProductType));
+        XPUSHs(sv_2mortal(newSViv(g_osver.wServicePackMajor)));
+        XPUSHs(sv_2mortal(newSViv(g_osver.wServicePackMinor)));
+        XPUSHs(sv_2mortal(newSViv(g_osver.wSuiteMask)));
+        XPUSHs(sv_2mortal(newSViv(g_osver.wProductType)));
     }
     PUTBACK;
 }
