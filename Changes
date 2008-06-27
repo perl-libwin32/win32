@@ -1,6 +1,6 @@
 Revision history for the Perl extension Win32.
 
-0.38	unreleased
+0.38	[2008-06-27]
 	- Fix Cygwin releated problems in t/GetCurrentThreadId.t
 	  (Jerry D. Hedden).
 
