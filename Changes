@@ -1,5 +1,9 @@
 Revision history for the Perl extension Win32.
 
+0.39	unrelease
+	- Add support for Windows 2008 Server in Win32::GetOSName() and
+	  in the documentation for Win32::GetOSVersion().
+
 0.38	[2008-06-27]
 	- Fix Cygwin releated problems in t/GetCurrentThreadId.t
 	  (Jerry D. Hedden).

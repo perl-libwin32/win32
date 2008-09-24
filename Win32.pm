@@ -8,7 +8,7 @@ BEGIN {
     require DynaLoader;
 
     @ISA = qw|Exporter DynaLoader|;
-    $VERSION = '0.38';
+    $VERSION = '0.39';
     $XS_VERSION = $VERSION;
     $VERSION = eval $VERSION;
 
@@ -160,15 +160,15 @@ sub CSIDL_CDBURN_AREA          ()       { 0x003B }     # <user name>\Local Setti
 my ($found_os, $found_desc);
 
 sub GetOSName {
-    my ($os,$desc,$major, $minor, $build, $id)=("","");
     unless (defined $found_os) {
-        # If we have a run this already, we have the results cached
-        # If so, return them
+        # If we have run this already, we have the results cached
 
         # Use the standard API call to determine the version
-        ($desc, $major, $minor, $build, $id) = Win32::GetOSVersion();
+        my($desc, $major, $minor, $build, $id, undef, undef, undef, $producttype)
+	    = Win32::GetOSVersion();
 
         # If id==0 then its a win32s box -- Meaning Win3.11
+	my $os;
         unless($id) {
             $os = 'Win32s';
         }
@@ -200,11 +200,12 @@ sub GetOSName {
 
         my $tag = "";
 
-        # But distinguising W2k and Vista from NT4 requires looking at the major version
+        # Distinguish between NT4, 2000, Vista and 2008
         if ($os eq "NT4") {
 	    $os = {5 => "2000", 6 => "Vista"}->{$major} || "NT4";
+	    # 2008 is same as Vista but has "Domaincontroller" or "Server" type
+	    $os = "2008" if $os eq "Vista" && $producttype != 1;
         }
-
         # For the rest we take a look at the build numbers and try to deduce
 	# the exact release name, but we put that in the $desc
         elsif ($os eq "95") {
@@ -536,7 +537,8 @@ elements are, respectively: An arbitrary descriptive string, the major
 version number of the operating system, the minor version number, the
 build number, and a digit indicating the actual operating system.
 For the ID, the values are 0 for Win32s, 1 for Windows 9X/Me and 2 for
-Windows NT/2000/XP/2003/Vista.  In scalar context it returns just the ID.
+Windows NT/2000/XP/2003/Vista/2008.  In scalar context it returns just
+the ID.
 
 Currently known values for ID MAJOR and MINOR are as follows:
 
@@ -551,9 +553,14 @@ Currently known values for ID MAJOR and MINOR are as follows:
     Windows XP             2      5       1
     Windows Server 2003    2      5       2
     Windows Vista          2      6       0
+    Windows Server 2008    2      6       0
 
 On Windows NT 4 SP6 and later this function returns the following
 additional values: SPMAJOR, SPMINOR, SUITEMASK, PRODUCTTYPE.
+
+The version numbers for Windows Vista and Windows Server 2008 are
+identical; the PRODUCTTYPE field must be used to differentiate
+between them.
 
 SPMAJOR and SPMINOR are are the version numbers of the latest
 installed service pack.
@@ -584,7 +591,10 @@ be one of the following integer values:
 
     1 - Workstation (NT 4, 2000 Pro, XP Home, XP Pro, Vista)
     2 - Domaincontroller
-    3 - Server
+    3 - Server (2000 Server, Server 2003, Server 2008)
+
+Note that a server that is also a domain controller is reported as
+PRODUCTTYPE 2 (Domaincontroller) and not PRODUCTTYPE 3 (Server).
 
 =item Win32::GetOSName()
 
@@ -597,7 +607,17 @@ GetOSVersion() in list context.
 
 Currently the possible values for the OS name are
 
- Win32s Win95 Win98 WinMe WinNT3.51 WinNT4 Win2000 WinXP/.Net Win2003 WinVista
+    Win32s
+    Win95
+    Win98
+    WinMe
+    WinNT3.51
+    WinNT4
+    Win2000
+    WinXP/.Net
+    Win2003
+    WinVista
+    Win2008
 
 This routine is just a simple interface into GetOSVersion().  More
 specific or demanding situations should use that instead.  Another
