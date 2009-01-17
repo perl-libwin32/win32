@@ -1,8 +1,10 @@
 Revision history for the Perl extension Win32.
 
-0.39	unrelease
+0.39	unreleased
 	- Add support for Windows 2008 Server in Win32::GetOSName() and
 	  in the documentation for Win32::GetOSVersion().
+	- Make Win32::GetOSName() implementation testable.
+	- Document that the OSName for Win32s is actually "WinWin32s".
 
 0.38	[2008-06-27]
 	- Fix Cygwin releated problems in t/GetCurrentThreadId.t

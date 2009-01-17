@@ -157,15 +157,19 @@ sub CSIDL_CDBURN_AREA          ()       { 0x003B }     # <user name>\Local Setti
 ### This method is just a simple interface into GetOSVersion().  More
 ### specific or demanding situations should use that instead.
 
-my ($found_os, $found_desc);
+my ($cached_os, $cached_desc);
 
 sub GetOSName {
-    unless (defined $found_os) {
-        # If we have run this already, we have the results cached
-
-        # Use the standard API call to determine the version
-        my($desc, $major, $minor, $build, $id, undef, undef, undef, $producttype)
+    unless (defined $cached_os) {
+	my($desc, $major, $minor, $build, $id, undef, undef, undef, $producttype)
 	    = Win32::GetOSVersion();
+	($cached_os, $cached_desc) = _GetOSName($desc, $major, $minor, $build, $id, $producttype);
+    }
+    return wantarray ? ($cached_os, $cached_desc) : $cached_os;
+}
+
+sub _GetOSName {
+    my($desc, $major, $minor, $build, $id, $producttype) = @_;
 
         # If id==0 then its a win32s box -- Meaning Win3.11
 	my $os;
@@ -232,12 +236,7 @@ sub GetOSName {
 	    }
 	}
 
-        # cache the results, so we dont have to do this again
-        $found_os      = "Win$os";
-        $found_desc    = $desc;
-    }
-
-    return wantarray ? ($found_os, $found_desc) : $found_os;
+     return ("Win$os", $desc);
 }
 
 # "no warnings 'redefine';" doesn't work for 5.8.7 and earlier
@@ -607,7 +606,7 @@ GetOSVersion() in list context.
 
 Currently the possible values for the OS name are
 
-    Win32s
+    WinWin32s
     Win95
     Win98
     WinMe
