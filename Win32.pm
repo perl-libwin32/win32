@@ -171,70 +171,46 @@ sub GetOSName {
 sub _GetOSName {
     my($desc, $major, $minor, $build, $id, $producttype) = @_;
 
-        # If id==0 then its a win32s box -- Meaning Win3.11
-	my $os;
-        unless($id) {
-            $os = 'Win32s';
-        }
-	else {
-	    # Magic numbers from MSDN documentation of OSVERSIONINFO
-	    # Most version names can be parsed from just the id and minor
-	    # version
-	    $os = {
-		1 => {
-		    0  => "95",
-		    10 => "98",
-		    90 => "Me"
-		},
-		2 => {
-		    0  => "NT4",
-		    1  => "XP/.Net",
-		    2  => "2003",
-		    51 => "NT3.51"
-		}
-	    }->{$id}->{$minor};
+    my($os,$tag);
+    if ($id == 0) {
+	$os = "Win32s";
+    }
+    elsif ($id == 1) {
+	$os = { 0 => "95", 10 => "98", 90 => "Me" }->{$minor};
+    }
+    elsif ($id == 2) {
+	if ($major == 3) {
+	    $os = "NT3.51";
 	}
-
-        # This _really_ shouldnt happen.  At least not for quite a while
-        # Politely warn and return undef
-        unless (defined $os) {
-            warn qq[Windows version [$id:$major:$minor] unknown!];
-            return undef;
-        }
-
-        my $tag = "";
-
-        # Distinguish between NT4, 2000, Vista and 2008
-        if ($os eq "NT4") {
-	    $os = {5 => "2000", 6 => "Vista"}->{$major} || "NT4";
+	elsif ($major == 4) {
+	    $os = "NT4";
+	}
+	elsif ($major == 5) {
+	    $os = { 0 => "2000", 1 => "XP/.Net", 2 => "2003" }->{$minor};
+	}
+	elsif ($major == 6) {
+	    $os = { 0 => "Vista", 1 => "7" }->{$minor};
 	    # 2008 is same as Vista but has "Domaincontroller" or "Server" type
 	    $os = "2008" if $os eq "Vista" && $producttype != 1;
-        }
-        # For the rest we take a look at the build numbers and try to deduce
-	# the exact release name, but we put that in the $desc
-        elsif ($os eq "95") {
-            if ($build eq '67109814') {
-                    $tag = '(a)';
-            }
-	    elsif ($build eq '67306684') {
-                    $tag = '(b1)';
-            }
-	    elsif ($build eq '67109975') {
-                    $tag = '(b2)';
-            }
-        }
-	elsif ($os eq "98" && $build eq '67766446') {
-            $tag = '(2nd ed)';
-        }
-
-	if (length $tag) {
-	    if (length $desc) {
-	        $desc = "$tag $desc";
-	    }
-	    else {
-	        $desc = $tag;
-	    }
 	}
+    }
+
+    unless (defined $os) {
+	warn "Unknown Windows version [$id:$major:$minor]";
+	return;
+    }
+
+    # Take a look at the build numbers and try to deduce
+    # the exact release name, but we put that in the $desc
+    if ($os eq "95") {
+	$tag = { 67109814 => "(a)", 67306684 => "(b1)", "67109975" => "(b2)" }->{$build};
+    }
+    elsif ($os eq "98" && $build eq "67766446") {
+	$tag = "(2nd ed)";
+    }
+    if ($tag) {
+	$desc = length($desc) ? "$tag $desc" : $tag;
+    }
 
      return ("Win$os", $desc);
 }
@@ -536,7 +512,7 @@ elements are, respectively: An arbitrary descriptive string, the major
 version number of the operating system, the minor version number, the
 build number, and a digit indicating the actual operating system.
 For the ID, the values are 0 for Win32s, 1 for Windows 9X/Me and 2 for
-Windows NT/2000/XP/2003/Vista/2008.  In scalar context it returns just
+Windows NT/2000/XP/2003/Vista/2008/7.  In scalar context it returns just
 the ID.
 
 Currently known values for ID MAJOR and MINOR are as follows:
@@ -553,6 +529,7 @@ Currently known values for ID MAJOR and MINOR are as follows:
     Windows Server 2003    2      5       2
     Windows Vista          2      6       0
     Windows Server 2008    2      6       0
+    Windows 7              2      6       1
 
 On Windows NT 4 SP6 and later this function returns the following
 additional values: SPMAJOR, SPMINOR, SUITEMASK, PRODUCTTYPE.
@@ -617,6 +594,7 @@ Currently the possible values for the OS name are
     Win2003
     WinVista
     Win2008
+    Win7
 
 This routine is just a simple interface into GetOSVersion().  More
 specific or demanding situations should use that instead.  Another
@@ -628,6 +606,9 @@ The name "WinXP/.Net" is used for historical reasons only, to maintain
 backwards compatibility of the Win32 module.  Windows .NET Server has
 been renamed as Windows 2003 Server before final release and uses a
 different major/minor version number than Windows XP.
+
+Similarly the name "WinWin32s" should have been "Win32s" but has been
+kept as-is for backwards compatibility reasons too.
 
 =item Win32::GetShortPathName(PATHNAME)
 
