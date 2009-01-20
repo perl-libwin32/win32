@@ -1,6 +1,6 @@
 Revision history for the Perl extension Win32.
 
-0.39	unreleased
+0.39	[2009-01-19]
 	- Add support for Windows 2008 Server and Windows 7 in
 	  Win32::GetOSName() and in the documentation for
 	  Win32::GetOSVersion().
