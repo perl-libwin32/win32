@@ -39,6 +39,7 @@ typedef BOOL (__stdcall *PFNEqualSid)(PSID, PSID);
 typedef void* (__stdcall *PFNFreeSid)(PSID);
 typedef BOOL (__stdcall *PFNIsUserAnAdmin)(void);
 typedef BOOL (WINAPI *PFNGetProductInfo)(DWORD, DWORD, DWORD, DWORD, DWORD*);
+typedef void (WINAPI *PFNGetNativeSystemInfo)(LPSYSTEM_INFO lpSystemInfo);
 
 #ifndef CSIDL_MYMUSIC
 #   define CSIDL_MYMUSIC              0x000D
@@ -792,9 +793,17 @@ XS(w32_GetChipName)
 {
     dXSARGS;
     SYSTEM_INFO sysinfo;
+    HMODULE module;
+    PFNGetNativeSystemInfo pfnGetNativeSystemInfo;
 
     Zero(&sysinfo,1,SYSTEM_INFO);
-    GetSystemInfo(&sysinfo);
+    module = GetModuleHandle("kernel32.dll");
+    GETPROC(GetNativeSystemInfo);
+    if (pfnGetNativeSystemInfo)
+        pfnGetNativeSystemInfo(&sysinfo);
+    else
+        GetSystemInfo(&sysinfo);
+
     /* XXX docs say dwProcessorType is deprecated on NT */
     XSRETURN_IV(sysinfo.dwProcessorType);
 }
