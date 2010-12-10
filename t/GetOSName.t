@@ -94,6 +94,7 @@ my @dual_tests = (
 ["7 [Starter]",                     "7",       2, 6, 1, 0x0b         ],
 ["7 [Home Basic]",                  "7",       2, 6, 1, 0x02         ],
 ["7 [Home Premium]",                "7",       2, 6, 1, 0x03         ],
+["7 [Professional]",                "7",       2, 6, 1, 0x06         ],
 ["7 [Professional]",                "7",       2, 6, 1, 0x30         ],
 ["7 [Enterprise]",                  "7",       2, 6, 1, 0x04         ],
 ["7 [Ultimate]",                    "7",       2, 6, 1, 0x01         ],

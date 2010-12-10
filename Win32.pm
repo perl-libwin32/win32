@@ -473,7 +473,8 @@ sub _GetOSName {
                $desc .= " Enterprise";
             }
             elsif ($productinfo == PRODUCT_BUSINESS) {
-               $desc .= " Business";
+	       # "Windows 7 Business" had a name change to "Windows 7 Professional"
+               $desc .= $minor == 0 ? " Business" : "Professional";
             }
             elsif ($productinfo == PRODUCT_STARTER) {
                $desc .= " Starter";
