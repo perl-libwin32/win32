@@ -5,6 +5,9 @@ Revision history for the Perl extension Win32.
 	  running 32-bit Perl on 64-bit Windows (WOW64).  This will also
 	  affect the values returned by Win32::GetOSDisplayName() and
 	  Win32::GetOSName(). [rt#63797]
+	- Fix Win32::GetOSDisplayName() to return the correct values for
+	  all products even when a service pack has been installed. (This
+	  was only an issue for some "special" editions).
 
 0.40	[2010-12-08]
 	- Add Win32::GetSystemMetrics function.

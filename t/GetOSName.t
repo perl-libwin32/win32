@@ -141,16 +141,20 @@ sub check {
 	$tag =~ s/^\s*//;
     }
 
+    my $sp = "Service Pack 42";
     # We pass the same value for $suitemask and $productinfo.  The former is
     # used for Windows up to 2003, the latter is used for Vista and later.
-    my($os, $desc) = Win32::_GetOSName("", $major||0, $minor||0, 0,
+    my($os, $desc) = Win32::_GetOSName($sp, $major||0, $minor||0, 0,
 				       $id, $sm||0, $pt||1, $sm||0, $arch, $metrics);
     my $display = Win32::GetOSDisplayName($os, $desc);
 
     note($pretty);
-    is($display, $pretty);
-    is($os, "Win$expect", "os:   $os");
-    is($desc, $tag,       "desc: $desc");
+    is($display, "$pretty $sp");
+
+    is($os,   "Win$expect", "os:   $os");
+
+    $expect = length($tag) ? "$tag $sp" : $sp;
+    is($desc, $expect, "desc: $desc");
 }
 
 check($_, Win32::PROCESSOR_ARCHITECTURE_INTEL) for @intel_tests, @dual_tests;

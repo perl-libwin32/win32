@@ -275,11 +275,12 @@ sub GetOSDisplayName {
     # Calling GetOSDisplayName() with arguments is for the test suite only!
     my($name,$desc) = @_ ? @_ : GetOSName();
     $name =~ s/^Win//;
-    if ($desc eq "Windows Home Server" || $desc eq "Windows XP Professional x64 Edition") {
+    if ($desc =~ /^Windows Home Server\b/ || $desc =~ /^Windows XP Professional x64 Edition\b/) {
 	($name, $desc) = ($desc, "");
     }
-    elsif ($desc =~ s/\s*(Windows (.*) Server( \d+)?)$//) {
-       ($name, $desc) = ("$1 $name", $desc);
+    elsif ($desc =~ s/\s*(Windows (.*) Server( \d+)?)//) {
+	$name = "$1 $name";
+	$desc =~ s/^\s+//;
     }
     else {
 	for ($name) {
