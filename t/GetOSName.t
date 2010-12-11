@@ -11,7 +11,7 @@ use Win32;
 # The "display name" value is the same as the $pretty field,
 # prefixed by "Windows ", with all "[]{}" characters removed.
 
-# $pretty, $os $id, $major, $minor, $sm, $pt, $metric, $tag
+# $pretty, $os $id, $major, $minor, $sm, $pt, $metric
 
 my @intel_tests = (
 ["Win32s",                          "Win32s",  0                     ],
@@ -115,15 +115,13 @@ plan tests => 6 * (@intel_tests + @amd64_tests + 2*@dual_tests + @ia64_tests);
 # Test internal implementation function
 sub check {
     my($test, $arch) = @_;
-    my($pretty, $expect, $id, $major, $minor, $sm, $pt, $metrics, $tag) = @$test;
+    my($pretty, $expect, $id, $major, $minor, $sm, $pt, $metrics) = @$test;
     $metrics = [$metrics] if defined($metrics) && not ref $metrics;
-    $tag ||= "";
 
-    unless ($tag) {
-	($pretty, $tag) = ("$1$2$3", "$2") if $pretty =~ /^(.*)\[(.*)\](.*)$/;
-	($pretty, $tag) = ("$1$2$3", "Windows $2") if $pretty =~ /^(.*)\{(.*)\}(.*)$/;
-	$tag = "R2 $tag" if $tag !~ /R2/ && $pretty =~ /R2$/;
-    }
+    my $tag = "";
+    ($pretty, $tag) = ("$1$2$3", "$2") if $pretty =~ /^(.*)\[(.*)\](.*)$/;
+    ($pretty, $tag) = ("$1$2$3", "Windows $2") if $pretty =~ /^(.*)\{(.*)\}(.*)$/;
+    $tag = "R2 $tag" if $tag !~ /R2/ && $pretty =~ /R2$/;
 
     # All display names start with "Windows";
     # and 2003/2008 start with "Windows Server"
