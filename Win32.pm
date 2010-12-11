@@ -301,9 +301,10 @@ sub GetOSDisplayName {
 
 sub _GetSystemMetrics {
     my($index,$metrics) = @_;
+    return Win32::GetSystemMetrics($index) unless ref $metrics;
     return $metrics->{$index} if ref $metrics eq "HASH" && defined $metrics->{$index};
     return 1 if ref $metrics eq "ARRAY" && grep $_ == $index, @$metrics;
-    return Win32::GetSystemMetrics($index);
+    return 0;
 }
 
 sub _GetOSName {

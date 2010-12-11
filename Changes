@@ -10,6 +10,9 @@ Revision history for the Perl extension Win32.
 	  was only an issue for some "special" editions).
 	- The display name for "Windows 7 Business Edition" is actually
 	  "Windows 7 Professional".
+	- Fix t/GetOSName.t tests to avoid using the values returned by
+	  GetSystemMetrics() when the test template didn't specify any
+	  value at all.
 
 0.40	[2010-12-08]
 	- Add Win32::GetSystemMetrics function.
