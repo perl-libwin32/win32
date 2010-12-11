@@ -1668,7 +1668,7 @@ XS(w32_GetSystemMetrics)
     if (items != 1)
 	Perl_croak(aTHX_ "usage: Win32::GetSystemMetrics($index)");
 
-    XSRETURN_IV(GetSystemMetrics(SvIV(ST(0))));
+    XSRETURN_IV(GetSystemMetrics((int)SvIV(ST(0))));
 }
 
 XS(w32_GetProductInfo)
