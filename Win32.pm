@@ -475,7 +475,7 @@ sub _GetOSName {
             }
             elsif ($productinfo == PRODUCT_BUSINESS) {
 	       # "Windows 7 Business" had a name change to "Windows 7 Professional"
-               $desc .= $minor == 0 ? " Business" : "Professional";
+               $desc .= $minor == 0 ? " Business" : " Professional";
             }
             elsif ($productinfo == PRODUCT_STARTER) {
                $desc .= " Starter";
