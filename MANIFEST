@@ -6,6 +6,7 @@ README
 Win32.pm
 Win32.xs
 longpath.inc
+t/CodePage.t
 t/CreateFile.t
 t/ExpandEnvironmentStrings.t
 t/GetCurrentThreadId.t

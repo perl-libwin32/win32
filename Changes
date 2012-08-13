@@ -1,5 +1,10 @@
 Revision history for the Perl extension Win32.
 
+0.45	[2012-08-07]
+	- add Win32::GetACP(), Win32::GetConsoleCP(),
+	  Win32::GetConsoleOutputCP(), Win32::GetOEMCP(), Win32::SetConsoleCP()
+	  and Win32::SetConsoleOutputCP(). [rt#78820] (Steve Hay)
+
 0.44	[2011-01-12]
 	- fix memory leak introduced in 0.43
 
