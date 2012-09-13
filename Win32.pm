@@ -200,7 +200,7 @@ sub PRODUCT_ENTERPRISE_SERVER_IA64           () { 0x00F } # Server Enterprise fo
 sub PRODUCT_BUSINESS_N                       () { 0x010 } # Business N
 sub PRODUCT_WEB_SERVER                       () { 0x011 } # Web Server (full installation)
 sub PRODUCT_CLUSTER_SERVER                   () { 0x012 } # HPC Edition
-sub PRODUCT_HOME_SERVER                      () { 0x013 } # Home Server Edition
+sub PRODUCT_HOME_SERVER                      () { 0x013 } # Windows Storage Server 2008 R2 Essentials
 sub PRODUCT_STORAGE_EXPRESS_SERVER           () { 0x014 } # Storage Server Express
 sub PRODUCT_STORAGE_STANDARD_SERVER          () { 0x015 } # Storage Server Standard
 sub PRODUCT_STORAGE_WORKGROUP_SERVER         () { 0x016 } # Storage Server Workgroup
@@ -215,6 +215,19 @@ sub PRODUCT_MEDIUMBUSINESS_SERVER_MANAGEMENT () { 0x01E } # Windows Essential Bu
 sub PRODUCT_MEDIUMBUSINESS_SERVER_SECURITY   () { 0x01F } # Windows Essential Business Server Security Server
 sub PRODUCT_MEDIUMBUSINESS_SERVER_MESSAGING  () { 0x020 } # Windows Essential Business Server Messaging Server
 sub PRODUCT_SERVER_FOUNDATION                () { 0x021 } # Server Foundation
+sub PRODUCT_HOME_PREMIUM_SERVER              () { 0x022 } # Windows Home Server 2011
+sub PRODUCT_SB_SOLUTION_SERVER               () { 0x032 } # Windows Small Business Server 2011 Essentials
+sub PRODUCT_SERVER_FOR_SB_SOLUTIONS          () { 0x033 } # Server For SB Solutions
+sub PRODUCT_STANDARD_SERVER_SOLUTIONS        () { 0x034 } # Server Solutions Premium
+sub PRODUCT_STANDARD_SERVER_SOLUTIONS_CORE   () { 0x035 } # Server Solutions Premium (core installation)
+sub PRODUCT_SB_SOLUTION_SERVER_EM            () { 0x036 } # Server For SB Solutions EM
+sub PRODUCT_SERVER_FOR_SB_SOLUTIONS_EM       () { 0x037 } # Server For SB Solutions EM
+sub PRODUCT_SOLUTION_EMBEDDEDSERVER          () { 0x038 } # Windows MultiPoint Server
+sub PRODUCT_ESSENTIALBUSINESS_SERVER_MGMT    () { 0x03B } # Windows Essential Server Solution Management
+sub PRODUCT_ESSENTIALBUSINESS_SERVER_ADDL    () { 0x03C } # Windows Essential Server Solution Additional
+sub PRODUCT_ESSENTIALBUSINESS_SERVER_MGMTSVC () { 0x03D } # Windows Essential Server Solution Management SVC
+sub PRODUCT_ESSENTIALBUSINESS_SERVER_ADDLSVC () { 0x03E } # Windows Essential Server Solution Additional SVC
+sub PRODUCT_SMALLBUSINESS_SERVER_PREMIUM_CORE () { 0x03F } # Small Business Server Premium (core installation)
 
 sub PRODUCT_SERVER_FOR_SMALLBUSINESS_V       () { 0x023 } # Windows Server 2008 without Hyper-V for Windows Essential Server Solutions
 sub PRODUCT_STANDARD_SERVER_V                () { 0x024 } # Server Standard without Hyper-V (full installation)
@@ -223,18 +236,37 @@ sub PRODUCT_ENTERPRISE_SERVER_V              () { 0x026 } # Server Enterprise wi
 sub PRODUCT_DATACENTER_SERVER_CORE_V         () { 0x027 } # Server Datacenter without Hyper-V (core installation)
 sub PRODUCT_STANDARD_SERVER_CORE_V           () { 0x028 } # Server Standard without Hyper-V (core installation)
 sub PRODUCT_ENTERPRISE_SERVER_CORE_V         () { 0x029 } # Server Enterprise without Hyper-V (core installation)
+sub PRODUCT_DATACENTER_EVALUATION_SERVER     () { 0x050 } # Server Datacenter (evaluation installation)
 sub PRODUCT_HYPERV                           () { 0x02A } # Microsoft Hyper-V Server
-
+sub PRODUCT_STORAGE_EXPRESS_SERVER_CORE      () { 0x02B } # Storage Server Express (core installation)
+sub PRODUCT_STORAGE_STANDARD_SERVER_CORE     () { 0x02C } # Storage Server Standard (core installation)
+sub PRODUCT_STORAGE_WORKGROUP_SERVER_CORE    () { 0x02D } # Storage Server Workgroup (core installation)
+sub PRODUCT_STORAGE_ENTERPRISE_SERVER_CORE   () { 0x02E } # Storage Server Enterprise (core installation)
 sub PRODUCT_STARTER_N                        () { 0x02F } # Starter N
 sub PRODUCT_PROFESSIONAL                     () { 0x030 } # Professional
 sub PRODUCT_PROFESSIONAL_N                   () { 0x031 } # Professional N
 
+sub PRODUCT_CLUSTER_SERVER_V                 () { 0x040 } # Server Hyper Core V
 sub PRODUCT_STARTER_E                        () { 0x042 } # Starter E
 sub PRODUCT_HOME_BASIC_E                     () { 0x043 } # Home Basic E
 sub PRODUCT_HOME_PREMIUM_E                   () { 0x044 } # Home Premium E
 sub PRODUCT_PROFESSIONAL_E                   () { 0x045 } # Professional E
 sub PRODUCT_ENTERPRISE_E                     () { 0x046 } # Enterprise E
 sub PRODUCT_ULTIMATE_E                       () { 0x047 } # Ultimate E
+sub PRODUCT_ENTERPRISE_EVALUATION            () { 0x048 } # Server Enterprise (evaluation installation)
+sub PRODUCT_MULTIPOINT_STANDARD_SERVER       () { 0x04C } # Windows MultiPoint Server Standard (full installation)
+sub PRODUCT_MULTIPOINT_PREMIUM_SERVER        () { 0x04D } # Windows MultiPoint Server Premium (full installation)
+sub PRODUCT_STANDARD_EVALUATION_SERVER       () { 0x04F } # Server Standard (evaluation installation)
+
+sub PRODUCT_ENTERPRISE_N_EVALUATION          () { 0x054 } # Enterprise N (evaluation installation)
+sub PRODUCT_STORAGE_WORKGROUP_EVALUATION_SERVER () { 0x05F } # Storage Server Workgroup (evaluation installation)
+sub PRODUCT_STORAGE_STANDARD_EVALUATION_SERVER () { 0x060 } # Storage Server Standard (evaluation installation)
+sub PRODUCT_CORE_N                           () { 0x062 } # Windows 8 N
+sub PRODUCT_CORE_COUNTRYSPECIFIC             () { 0x063 } # Windows 8 China
+sub PRODUCT_CORE_SINGLELANGUAGE              () { 0x064 } # Windows 8 Single Language
+sub PRODUCT_CORE                             () { 0x065 } # Windows 8
+sub PRODUCT_PROFESSIONAL_WMC                 () { 0x067 } # Professional with Media Center
+
 
 sub PRODUCT_UNLICENSED                       () { 0xABCDABCD } # product has not been activated and is no longer in the grace period
 
@@ -292,7 +324,7 @@ sub GetOSDisplayName {
 		$desc =~ s/^\s*//;
 		s/(200.)/$name Server $1/;
 	    }
-	    s/^Windows (200[38])/Windows Server $1/;
+	    s/^Windows (20(03|08|12))/Windows Server $1/;
 	}
     }
     $name .= " $desc" if length $desc;
@@ -460,8 +492,16 @@ sub _GetOSName {
 		    $desc = "R2";
 		}
 	    }
+	    elsif ($minor == 2) {
+	    if ($producttype == VER_NT_WORKSTATION) {
+	        $os = "8";
+	    }
+	    else {
+	        $os = "2012";
+	    }
+	    }
 
-            if ($productinfo == PRODUCT_ULTIMATE) {
+        if ($productinfo == PRODUCT_ULTIMATE) {
 		$desc .= " Ultimate";
 	    }
             elsif ($productinfo == PRODUCT_HOME_PREMIUM) {
@@ -970,6 +1010,8 @@ Currently known values for ID MAJOR and MINOR are as follows:
     Windows Server 2008      2      6       0
     Windows 7                2      6       1
     Windows Server 2008 R2   2      6       1
+    Windows 8                2      6       2
+    Windows Server 2012      2      6       2
 
 On Windows NT 4 SP6 and later this function returns the following
 additional values: SPMAJOR, SPMINOR, SUITEMASK, PRODUCTTYPE.
@@ -983,6 +1025,10 @@ identical; the PRODUCTTYPE field must be used to differentiate between
 them.
 
 The version numbers for Windows 7 and Windows Server 2008 R2 are
+identical; the PRODUCTTYPE field must be used to differentiate between
+them.
+
+The version numbers for Windows 2 and Windows Server 2012 are
 identical; the PRODUCTTYPE field must be used to differentiate between
 them.
 
@@ -1016,9 +1062,9 @@ constants.
 PRODUCTTYPE provides additional information about the system.  It should
 be one of the following integer values:
 
-    1 - Workstation (NT 4, 2000 Pro, XP Home, XP Pro, Vista)
+    1 - Workstation (NT 4, 2000 Pro, XP Home, XP Pro, Vista, etc)
     2 - Domaincontroller
-    3 - Server (2000 Server, Server 2003, Server 2008)
+    3 - Server (2000 Server, Server 2003, Server 2008, etc)
 
 Note that a server that is also a domain controller is reported as
 PRODUCTTYPE 2 (Domaincontroller) and not PRODUCTTYPE 3 (Server).
