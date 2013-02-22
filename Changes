@@ -5,7 +5,7 @@ Revision history for the Perl extension Win32.
           Win32::GetArchName() in t/Names.t.  It may be undefined when
           the test is running under Cygwin crond.
         - In t/Names.t don't assume that LoginName or NodeName is at
-          least 2 characters long; it may just be 1.
+          least 2 characters long; it may just be 1. [rt#83474]
 
 0.46    [2013-02-19]
         - add Win2012/Win8 detection (thanks to Michiel Beijen) [rt#82572]
