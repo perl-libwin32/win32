@@ -49,9 +49,9 @@ is( $osname2, $osname, "  - checking that OS name is the same in both calls" );
 # test Win32::LoginName()
 my $login = eval { Win32::LoginName() };
 is( $@, '', "Win32::LoginName()" );
-cmp_ok( length($login), '>', 1, "  - checking returned login name" );
+cmp_ok( length($login), '>', 0, "  - checking returned login name" );
 
 # test Win32::NodeName()
 my $nodename = eval { Win32::NodeName() };
 is( $@, '', "Win32::NodeName()" );
-cmp_ok( length($nodename), '>', 1, "  - checking returned node name" );
+cmp_ok( length($nodename), '>', 0, "  - checking returned node name" );
