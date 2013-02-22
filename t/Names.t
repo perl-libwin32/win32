@@ -23,6 +23,7 @@ if (Win32::IsWinNT()) {
 }
 
 # test Win32::GetArchName()
+$ENV{PROCESSOR_ARCHITECTURE} ||= "unknown";
 my $archname = eval { Win32::GetArchName() };
 is( $@, '', "Win32::GetArchName()" );
 cmp_ok( length($archname), '>=', 3, "  - checking returned architecture name" );
