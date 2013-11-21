@@ -1,5 +1,13 @@
 Revision history for the Perl extension Win32.
 
+0.48    [2013-11-20]
+        - Typo fixes by David Steinbrunner.
+        - Fix required perl version 5.6 -> 5.006.
+        - Don't call note() in t/GetOSName.t when it has not been
+          imported from Test::More.
+        - Convert t/GetOSName.t to Unix line endings like the rest of
+          this repo.
+
 0.47    [2013-02-21]
         - Make sure %PROCESSOR_ARCHITECTURE% is defined before calling
           Win32::GetArchName() in t/Names.t.  It may be undefined when
