@@ -1,5 +1,13 @@
 Revision history for the Perl extension Win32.
 
+0.51    [2015-01-26]
+        - Win32-0.50 was released to CPAN from an out-dated Git repo, so
+          didn't actually include the merged pull requests.
+
+0.50    [2015-01-26]
+        - add GetOSName support for Windows 8.1 (thanks to Tony Cook) [PR/6]
+        - Fix build in C++ mode (thanks to Steve Hay and Daniel Dragan) [PR/7]
+
 0.49    [2014-04-15]
         - Make sure Win32.xs uses winsock2.h and not winsock.h. [rt#94730]
 
