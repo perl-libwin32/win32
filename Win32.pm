@@ -468,6 +468,15 @@ sub _GetOSName {
 	        $os = "2012";
 	    }
 	    }
+	    elsif ($minor == 3) {
+		if ($producttype == VER_NT_WORKSTATION) {
+		    $os = "8.1";
+		}
+		else {
+		    $os = "2012";
+		    $desc = "R2";
+		}
+	    }
 
         if ($productinfo == PRODUCT_ULTIMATE) {
 		$desc .= " Ultimate";
