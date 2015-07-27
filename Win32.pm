@@ -540,7 +540,12 @@ sub _GetOSName {
 	    elsif ($arch == PROCESSOR_ARCHITECTURE_AMD64) {
 		$desc .= " (64-bit)";
 	    }
-	}
+	} 
+	elsif ($major == 10) {
+	    if ($minor == 0) {
+                $os = '10';
+            }
+        }
     }
 
     unless (defined $os) {
