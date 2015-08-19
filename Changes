@@ -1,5 +1,12 @@
 Revision history for the Perl extension Win32.
 
+0.52    [2015-08-19]
+        - minimal Windows 10 support (thanks to Joel Maslak) [PR/8]
+        - refactor Windows 10 support to include ProductInfo flags
+        - add tests for Windows 8.1, 10, and 2012 R2 server
+        - define additional ProductInfo flags (TODO: add support for
+          these codes in _GetOSName)
+
 0.51    [2015-01-26]
         - Win32-0.50 was released to CPAN from an out-dated Git repo, so
           didn't actually include the merged pull requests.
