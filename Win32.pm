@@ -477,8 +477,13 @@ sub _GetOSName {
 		    $desc = "R2";
 		}
 	    }
+        }
+	elsif ($major == 10) {
+            $os = '10';
+        }
 
-        if ($productinfo == PRODUCT_ULTIMATE) {
+        if ($major >= 6) {
+            if ($productinfo == PRODUCT_ULTIMATE) {
 		$desc .= " Ultimate";
 	    }
             elsif ($productinfo == PRODUCT_HOME_PREMIUM) {
@@ -541,11 +546,6 @@ sub _GetOSName {
 		$desc .= " (64-bit)";
 	    }
 	} 
-	elsif ($major == 10) {
-	    if ($minor == 0) {
-                $os = '10';
-            }
-        }
     }
 
     unless (defined $os) {
