@@ -5,9 +5,9 @@ package Win32;
     use vars qw|$VERSION $XS_VERSION @ISA @EXPORT @EXPORT_OK|;
 
     require Exporter;
-    require DynaLoader;
+    require XSLoader;
 
-    @ISA = qw|Exporter DynaLoader|;
+    @ISA = qw|Exporter|;
     $VERSION = '0.52';
     $XS_VERSION = $VERSION;
     $VERSION = eval $VERSION;
@@ -647,7 +647,7 @@ sub _GetOSName {
 
 # "no warnings 'redefine';" doesn't work for 5.8.7 and earlier
 local $^W = 0;
-bootstrap Win32;
+XSLoader::load('Win32');
 
 1;
 
