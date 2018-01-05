@@ -1,5 +1,8 @@
 Revision history for the Perl extension Win32.
 
+0.52_01 [2017-11-30]
+        - add missing const
+
 0.52    [2015-08-19]
         - minimal Windows 10 support (thanks to Joel Maslak) [PR/8]
         - refactor Windows 10 support to include ProductInfo flags
