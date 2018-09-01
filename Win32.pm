@@ -657,6 +657,24 @@ __END__
 
 Win32 - Interfaces to some Win32 API Functions
 
+=head1 CAVEATS
+
+=head2 Short Path Names
+
+There are many situations in which modern Windows systems will not have short
+path names available. Shortpath usage can be configured system-wide via the
+registry, but the default on modern systems is to configure shortpath usage per
+volume. This can be queried, but not reliably or easily.
+
+On the shell level it can be queried with C<fsutil 8dot3name query c:>, on the C
+level it can be queried with a C<FSCTL_QUERY_PERSISTENT_VOLUME_STATE> request to
+the API call C<DeviceIOControl> as described in
+L<this article|https://www.codeproject.com/Articles/304374/Query-Volume-Setting-for-State-Windows>.
+
+The Win32 module doesn't check for any of these and simply fetches short path
+names in the same manner as the Windows API call does it: The call will succeed
+but return the long name.
+
 =head1 DESCRIPTION
 
 The Win32 module contains functions to access Win32 APIs.
