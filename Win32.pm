@@ -675,6 +675,11 @@ The Win32 module doesn't check for any of these and simply fetches short path
 names in the same manner as the Windows API call does it: The call will succeed
 but return the long name.
 
+Note that volumes for which this happens won't allow C<GetANSIPathName> to
+return useful filenames for files that contain unicode characters. It relies on
+C<GetShortPathName> returning 8.3 filenames, but absent those it'll return the
+unicode filename with unicode characters replaced with question mark characters.
+
 =head1 DESCRIPTION
 
 The Win32 module contains functions to access Win32 APIs.

@@ -18,6 +18,11 @@ BEGIN {
 	print "1..0 # Skip: Unicode support requires Windows 2000 or later\n";
 	exit 0;
     }
+    my $short = Win32::GetShortPathName(Win32::GetCwd().'\t\ExpandEnvironmentStrings.t');
+    if(length $short > 12) {
+	print "1..0 # Skip: The current volume does't support short names\n";
+	exit 0;
+    }
 }
 
 my $home = Win32::GetCwd();
