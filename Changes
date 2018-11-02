@@ -1,5 +1,11 @@
 Revision history for the Perl extension Win32.
 
+0.52_02 [2018-11-02]
+        - added () usage croaks.
+        - Fixed a -Warray-bounds buffer overflow in LONGPATH,
+        - Fix various -Wunused warnings
+          and two -Wmaybe-uninitialized.
+
 0.52_01 [2017-11-30]
         - add missing const
 
