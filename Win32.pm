@@ -174,6 +174,7 @@ sub VER_SUITE_STORAGE_SERVER           () { 0x00002000 } # Windows Storage Serve
 sub VER_SUITE_TERMINAL                 () { 0x00000010 } # Terminal Services is installed. This value is always set.
 # If VER_SUITE_TERMINAL is set but VER_SUITE_SINGLEUSERTS is not set, the system is running in application server mode.
 sub VER_SUITE_WH_SERVER                () { 0x00008000 } # Windows Home Server is installed.
+sub VER_SUITE_MULTIUSERTS              () { 0x00020000 } # AppServer mode is enabled.
 
 
 sub SM_TABLETPC                ()       { 86 }
@@ -359,7 +360,8 @@ sub GetOSDisplayName {
 		$desc =~ s/^\s*//;
 		s/(200.)/$name Server $1/;
 	    }
-	    s/^Windows (20(03|08|12))/Windows Server $1/;
+	    s/^Windows (20(03|08|12|16|19))/Windows Server $1/;
+        s/^Windows SAC/Windows Server/;
 	}
     }
     $name .= " $desc" if length $desc;
@@ -544,10 +546,44 @@ sub _GetOSName {
 		    $desc = "R2";
 		}
 	    }
-        }
+    }
 	elsif ($major == 10) {
+        if ($producttype == VER_NT_WORKSTATION) {
             $os = '10';
+            if ($build == 10240) {
+                $desc = ", version 1507 (RTM)";    
+            } elsif ($build == 14393) {
+                $desc = ", version 1607";
+            } elsif ($build == 15063) {
+                $desc = ", version 1703";
+            } elsif ($build == 16299) {
+                $desc = ", version 1709";
+            } elsif ($build == 17134) {
+                $desc = ", version 1803";
+            } elsif ($build == 17763) {
+                $desc = ", version 1809";
+            } else {
+                $desc = ", version <unknown>";
+            }
+        } else {
+            if ($build == 14393) {
+                $os = "2016";
+                $build = ", version 1607";
+            } elsif ($build == 17763) {
+                $os = "2019";
+                $build = ", version 1809";
+            } else {
+                $os = "SAC";
+                if ($build == 16299) {
+                    $desc = ", version 1709";    
+                } elsif ($build == 17134) {
+                    $desc = ", version 1803";
+                } else {
+                    $desc = ", version <unknown>";
+                }
+            }
         }
+    }
 
         if ($major >= 6) {
             if ($productinfo == PRODUCT_ULTIMATE) {
@@ -998,6 +1034,10 @@ GetOSVersion() in list context.
 The description will also include tags for other special editions,
 like "R2", "Media Center", "Tablet PC", or "Starter Edition".
 
+In the Windows 10 / Server Semi-Annual Channel era, the description may
+contain the relevant ReleaseId value, but this is only inferred from
+the build number, not determined absolutely.
+
 Currently the possible values for the OS name are
 
     WinWin32s
@@ -1013,6 +1053,12 @@ Currently the possible values for the OS name are
     WinVista
     Win2008
     Win7
+    Win8
+    Win8.1
+    Win10
+    Win2016
+    Win2019
+    WinSAC
 
 This routine is just a simple interface into GetOSVersion().  More
 specific or demanding situations should use that instead.  Another
@@ -1038,30 +1084,36 @@ For the ID, the values are 0 for Win32s, 1 for Windows 9X/Me and 2 for
 Windows NT/2000/XP/2003/Vista/2008/7.  In scalar context it returns just
 the ID.
 
-Currently known values for ID MAJOR and MINOR are as follows:
+Currently known values for ID MAJOR MINOR and BUILD are as follows:
 
-    OS                      ID    MAJOR   MINOR
-    Win32s                   0      -       -
-    Windows 95               1      4       0
-    Windows 98               1      4      10
-    Windows Me               1      4      90
+    OS                      ID    MAJOR   MINOR   BUILD
+    Win32s                   0      -       -       -
+    Windows 95               1      4       0       -
+    Windows 98               1      4      10       -
+    Windows Me               1      4      90       -
 
-    Windows NT 3.51          2      3      51
-    Windows NT 4             2      4       0
+    Windows NT 3.51          2      3      51       -
+    Windows NT 4             2      4       0       -
 
-    Windows 2000             2      5       0
-    Windows XP               2      5       1
-    Windows Server 2003      2      5       2
-    Windows Server 2003 R2   2      5       2
-    Windows Home Server      2      5       2
+    Windows 2000             2      5       0       -
+    Windows XP               2      5       1       -
+    Windows Server 2003      2      5       2       -
+    Windows Server 2003 R2   2      5       2       -
+    Windows Home Server      2      5       2       -
 
-    Windows Vista            2      6       0
-    Windows Server 2008      2      6       0
-    Windows 7                2      6       1
-    Windows Server 2008 R2   2      6       1
-    Windows 8                2      6       2
-    Windows Server 2012      2      6       2
-
+    Windows Vista            2      6       0       -
+    Windows Server 2008      2      6       0       -
+    Windows 7                2      6       1       -
+    Windows Server 2008 R2   2      6       1       -
+    Windows 8                2      6       2       -
+    Windows Server 2012      2      6       2       -
+    Windows 8.1              2      6       2       -
+    Windows Server 2012 R2   2      6       2       -
+    
+    Windows 10               2     10       0       -
+    Windows Server 2016      2     10       0   14393
+    Windows Server 2019      2     10       0   17677
+    
 On Windows NT 4 SP6 and later this function returns the following
 additional values: SPMAJOR, SPMINOR, SUITEMASK, PRODUCTTYPE.
 
@@ -1081,8 +1133,14 @@ The version numbers for Windows 8 and Windows Server 2012 are
 identical; the PRODUCTTYPE field must be used to differentiate between
 them.
 
+For modern Windows releases, the major and minor version numbers are
+identical. The PRODUCTTYPE field must be used to differentiate between
+Windows 10 and Server releases. The BUILD field is used to
+differentiate Windows Server versions: currently 2016, 2019, and
+Semi-Annual Channel releases.
+
 SPMAJOR and SPMINOR are the version numbers of the latest
-installed service pack.
+installed service pack. (In the Windows 10 era, these are unused.)
 
 SUITEMASK is a bitfield identifying the product suites available on
 the system.  Known bits are:
@@ -1103,6 +1161,7 @@ the system.  Known bits are:
     VER_SUITE_STORAGE_SERVER            0x00002000
     VER_SUITE_COMPUTE_SERVER            0x00004000
     VER_SUITE_WH_SERVER                 0x00008000
+    VER_SUITE_MULTIUSERTS               0x00020000
 
 The VER_SUITE_xxx names are listed here to cross reference the Microsoft
 documentation.  The Win32 module does not provide symbolic names for these
