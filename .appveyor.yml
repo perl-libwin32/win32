@@ -7,6 +7,8 @@ matrix:
 environment:
   matrix:
     - perl_type: cygwin
+    - perl_type: cygwin
+      configure_args: "CC=g++"
     - perl_type: strawberry
       perl_version: 5.28.0.1
     - perl_type: strawberry
@@ -32,4 +34,4 @@ install:
 build: off
 
 test_script:
-  - '%cpanm% --test-only -v .'
+  - '%cpanm% --test-only --configure-args "%configure_args%" -v .'
