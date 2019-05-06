@@ -203,7 +203,7 @@ wstr_to_sv(pTHX_ WCHAR *wstr)
  * characters for the characters not in the ANSI codepage.
  */
 SV*
-get_unicode_env(pTHX_ WCHAR *name)
+get_unicode_env(pTHX_ const WCHAR *name)
 {
     SV *sv = NULL;
     void *env;
@@ -699,7 +699,7 @@ XS(w32_MsgBox)
             Safefree(title);
     }
     else {
-        char *title = "Perl";
+        const char *title = "Perl";
         char *msg = SvPV_nolen(ST(0));
         if (items > 2)
             title = SvPV_nolen(ST(2));
@@ -906,7 +906,7 @@ XS(w32_GetFolderPath)
         SV *sv;
         HKEY hkey;
         HKEY root = HKEY_CURRENT_USER;
-        WCHAR *name = NULL;
+        const WCHAR *name = NULL;
 
         switch (folder) {
         case CSIDL_ADMINTOOLS:                  name = L"Administrative Tools";        break;
