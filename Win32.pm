@@ -361,7 +361,7 @@ sub GetOSDisplayName {
 		s/(200.)/$name Server $1/;
 	    }
 	    s/^Windows (20(03|08|12|16|19))/Windows Server $1/;
-        s/^Windows SAC/Windows Server/;
+            s/^Windows SAC/Windows Server/;
 	}
     }
     $name .= " $desc" if length $desc;
@@ -530,12 +530,12 @@ sub _GetOSName {
 		}
 	    }
 	    elsif ($minor == 2) {
-	    if ($producttype == VER_NT_WORKSTATION) {
-	        $os = "8";
-	    }
-	    else {
-	        $os = "2012";
-	    }
+                if ($producttype == VER_NT_WORKSTATION) {
+                    $os = "8";
+                }
+                else {
+                    $os = "2012";
+                }
 	    }
 	    elsif ($minor == 3) {
 		if ($producttype == VER_NT_WORKSTATION) {
@@ -546,100 +546,132 @@ sub _GetOSName {
 		    $desc = "R2";
 		}
 	    }
-    }
+        }
 	elsif ($major == 10) {
-        if ($producttype == VER_NT_WORKSTATION) {
-            $os = '10';
-            if ($build == 10240) {
-                $desc = ", version 1507 (RTM)";    
-            } elsif ($build == 14393) {
-                $desc = ", version 1607";
-            } elsif ($build == 15063) {
-                $desc = ", version 1703";
-            } elsif ($build == 16299) {
-                $desc = ", version 1709";
-            } elsif ($build == 17134) {
-                $desc = ", version 1803";
-            } elsif ($build == 17763) {
-                $desc = ", version 1809";
-            } else {
-                $desc = ", version <unknown>";
+            if ($producttype == VER_NT_WORKSTATION) {
+                # Build numbers from https://en.wikipedia.org/wiki/Windows_10_version_history
+                $os = '10';
+                if (9841 <= $build && $build <= 10240) {
+                    $desc = " Version 1507";
+                    $desc .= " (Preview Build $build)" if $build < 10240;
+                    $desc .= " (RTM)" if $build == 10240;
+                }
+                elsif (10525 <= $build && $build <= 10586) {
+                    $desc = " Version 1511 (November Update)";
+                    $desc .= " (Preview Build $build)" if $build < 10586;
+                }
+                elsif (11082 <= $build && $build <= 14393) {
+                    $desc = " Version 1607 (Anniversary Update)";
+                    $desc .= " (Preview Build $build)" if $build < 14393;
+                }
+                elsif (14901 <= $build && $build <= 15063) {
+                    $desc = " Version 1703 (Creators Update)";
+                    $desc .= " (Preview Build $build)" if $build < 15063;
+                }
+                elsif (16170 <= $build && $build <= 16299) {
+                    $desc = " Version 1709 (Fall Creators Update)";
+                    $desc .= " (Preview Build $build)" if $build < 16299;
+                }
+                elsif (16353 <= $build && $build <= 17134) {
+                    $desc = " Version 1803 (April 2018 Update)";
+                    $desc .= " (Preview Build $build)" if $build < 17134;
+                }
+                elsif (17604 <= $build && $build <= 17763) {
+                    $desc = " Version 1809 (October 2018 Update)";
+                    $desc .= " (Preview Build $build)" if $build < 17763;
+                }
+                elsif (18204 <= $build && $build <= 18362) {
+                    $desc = " Version 1903 (May 2019 Update)";
+                    $desc .= " (Preview Build $build)" if $build < 18362;
+                }
+                else {
+                    $desc = " Build $build";
+                }
             }
-        } else {
-            if ($build == 14393) {
-                $os = "2016";
-                $build = ", version 1607";
-            } elsif ($build == 17763) {
-                $os = "2019";
-                $build = ", version 1809";
-            } else {
-                $os = "SAC";
-                if ($build == 16299) {
-                    $desc = ", version 1709";    
-                } elsif ($build == 17134) {
-                    $desc = ", version 1803";
-                } else {
-                    $desc = ", version <unknown>";
+            else {
+                if ($build == 14393) {
+                    $os = "2016";
+                    $desc = "Version 1607";
+                }
+                elsif ($build == 17763) {
+                    $os = "2019";
+                    $desc = "Version 1809";
+                }
+                else {
+                    $os = "Server";
+                    if ($build == 16299) {
+                        $desc = "Version 1709";
+                    }
+                    elsif ($build == 17134) {
+                        $desc = "Version 1803";
+                    }
+                    elsif ($build == 18362) {
+                        $desc = "Version 1903";
+                    }
+                    else {
+                        $desc = "Build $build";
+                    }
                 }
             }
         }
-    }
 
         if ($major >= 6) {
-            if ($productinfo == PRODUCT_ULTIMATE) {
-		$desc .= " Ultimate";
-	    }
-            elsif ($productinfo == PRODUCT_HOME_PREMIUM) {
-               $desc .= " Home Premium";
-            }
-            elsif ($productinfo == PRODUCT_HOME_BASIC) {
-               $desc .= " Home Basic";
-            }
-            elsif ($productinfo == PRODUCT_ENTERPRISE) {
-               $desc .= " Enterprise";
-            }
-            elsif ($productinfo == PRODUCT_BUSINESS) {
-	       # "Windows 7 Business" had a name change to "Windows 7 Professional"
-               $desc .= $minor == 0 ? " Business" : " Professional";
-            }
-            elsif ($productinfo == PRODUCT_STARTER) {
-               $desc .= " Starter";
-            }
-            elsif ($productinfo == PRODUCT_CLUSTER_SERVER) {
-               $desc .= " HPC Server";
-            }
-            elsif ($productinfo == PRODUCT_DATACENTER_SERVER) {
-               $desc .= " Datacenter";
-            }
-            elsif ($productinfo == PRODUCT_DATACENTER_SERVER_CORE) {
-               $desc .= " Datacenter Edition (core installation)";
-            }
-            elsif ($productinfo == PRODUCT_ENTERPRISE_SERVER) {
-               $desc .= " Enterprise";
-            }
-            elsif ($productinfo == PRODUCT_ENTERPRISE_SERVER_CORE) {
-               $desc .= " Enterprise Edition (core installation)";
-            }
-            elsif ($productinfo == PRODUCT_ENTERPRISE_SERVER_IA64) {
-               $desc .= " Enterprise Edition for Itanium-based Systems";
-            }
-            elsif ($productinfo == PRODUCT_SMALLBUSINESS_SERVER) {
-               $desc .= " Small Business Server";
-            }
-            elsif ($productinfo == PRODUCT_SMALLBUSINESS_SERVER_PREMIUM) {
-               $desc .= " Small Business Server Premium Edition";
-            }
-            elsif ($productinfo == PRODUCT_STANDARD_SERVER) {
-               $desc .= " Standard";
-            }
-            elsif ($productinfo == PRODUCT_STANDARD_SERVER_CORE) {
-               $desc .= " Standard Edition (core installation)";
-            }
-            elsif ($productinfo == PRODUCT_WEB_SERVER) {
-               $desc .= " Web Server";
-            }
-            elsif ($productinfo == PRODUCT_PROFESSIONAL) {
-               $desc .= " Professional";
+            if ($major == 6) {
+                if ($productinfo == PRODUCT_ULTIMATE) {
+                    $desc .= " Ultimate";
+                }
+                elsif ($productinfo == PRODUCT_HOME_PREMIUM) {
+                    $desc .= " Home Premium";
+                }
+                elsif ($productinfo == PRODUCT_HOME_BASIC) {
+                    $desc .= " Home Basic";
+                }
+                elsif ($productinfo == PRODUCT_ENTERPRISE) {
+                    $desc .= " Enterprise";
+                }
+                elsif ($productinfo == PRODUCT_BUSINESS) {
+                    # "Windows 7 Business" had a name change to "Windows 7 Professional"
+                    $desc .= $minor == 0 ? " Business" : " Professional";
+                }
+                elsif ($productinfo == PRODUCT_STARTER) {
+                    $desc .= " Starter";
+                }
+                elsif ($productinfo == PRODUCT_CLUSTER_SERVER) {
+                    $desc .= " HPC Server";
+                }
+                elsif ($productinfo == PRODUCT_DATACENTER_SERVER) {
+                    $desc .= " Datacenter";
+                }
+                elsif ($productinfo == PRODUCT_DATACENTER_SERVER_CORE) {
+                    $desc .= " Datacenter Edition (core installation)";
+                }
+                elsif ($productinfo == PRODUCT_ENTERPRISE_SERVER) {
+                    $desc .= " Enterprise";
+                }
+                elsif ($productinfo == PRODUCT_ENTERPRISE_SERVER_CORE) {
+                    $desc .= " Enterprise Edition (core installation)";
+                }
+                elsif ($productinfo == PRODUCT_ENTERPRISE_SERVER_IA64) {
+                    $desc .= " Enterprise Edition for Itanium-based Systems";
+                }
+                elsif ($productinfo == PRODUCT_SMALLBUSINESS_SERVER) {
+                    $desc .= " Small Business Server";
+                }
+                elsif ($productinfo == PRODUCT_SMALLBUSINESS_SERVER_PREMIUM) {
+                    $desc .= " Small Business Server Premium Edition";
+                }
+                elsif ($productinfo == PRODUCT_STANDARD_SERVER) {
+                    $desc .= " Standard";
+                }
+                elsif ($productinfo == PRODUCT_STANDARD_SERVER_CORE) {
+                    $desc .= " Standard Edition (core installation)";
+                }
+                elsif ($productinfo == PRODUCT_WEB_SERVER) {
+                    $desc .= " Web Server";
+                }
+                elsif ($productinfo == PRODUCT_PROFESSIONAL) {
+                    $desc .= " Professional";
+                }
             }
 
 	    if ($arch == PROCESSOR_ARCHITECTURE_INTEL) {
@@ -648,7 +680,7 @@ sub _GetOSName {
 	    elsif ($arch == PROCESSOR_ARCHITECTURE_AMD64) {
 		$desc .= " (64-bit)";
 	    }
-	} 
+	}
     }
 
     unless (defined $os) {
