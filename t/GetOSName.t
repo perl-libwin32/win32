@@ -135,6 +135,9 @@ my @win10_tests = (
 ["10 [Version 1903 (May 2019 Update) (Preview Build 18204)]",      "10", 2, 10, 0, 0x00, 0, 0, 18204],
 ["10 [Version 1903 (May 2019 Update)]",                            "10", 2, 10, 0, 0x00, 0, 0, 18362],
 
+#For some reason, the 1909 preview builds were all varients of 18362.
+["10 [Version 1909 (November 2019 Update)]",                       "10", 2, 10, 0, 0x00, 0, 0, 18363],
+
 ["2016 [Version 1607]",                                    "2016",    2, 10, 0, 0x07, 2, 0, 14393],
 ["2019 [Version 1809]",                                    "2019",    2, 10, 0, 0x07, 2, 0, 17763],
 
@@ -143,6 +146,7 @@ my @win10_tests = (
 # The 1809 version from the semi-annual channel will identify as "Windows Server 2019 Version 1809"
 #["Server [Version 1809]",                                 "Server",  2, 10, 0, 0x07, 2, 0, 17763],
 ["Server [Version 1903]",                                  "Server",  2, 10, 0, 0x07, 2, 0, 18362],
+["Server [Version 1909]",                                  "Server",  2, 10, 0, 0x07, 2, 0, 18363],
 ["Server [Build 12345]",                                   "Server",  2, 10, 0, 0x07, 2, 0, 12345],
 
 );

@@ -584,6 +584,10 @@ sub _GetOSName {
                     $desc = " Version 1903 (May 2019 Update)";
                     $desc .= " (Preview Build $build)" if $build < 18362;
                 }
+                elsif (18363 <= $build && $build <= 18363) {
+                    $desc = " Version 1909 (November 2019 Update)";
+                    # Previous 1909 builds all had build number 18362
+                }
                 else {
                     $desc = " Build $build";
                 }
@@ -607,6 +611,9 @@ sub _GetOSName {
                     }
                     elsif ($build == 18362) {
                         $desc = "Version 1903";
+                    }
+                    elsif ($build == 18363) {
+                        $desc = "Version 1909";
                     }
                     else {
                         $desc = "Build $build";
