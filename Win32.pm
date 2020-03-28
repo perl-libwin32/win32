@@ -1423,4 +1423,37 @@ DllUnregisterServer.
 
 =back
 
+=head1 CAVEATS
+
+=head2 Short Path Names
+
+There are many situations in which modern Windows systems will not have
+the L<short path name|https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file#short-vs-long-names>
+(also called 8.3 or MS-DOS) alias for long file names available.
+
+Short path support can be configured system-wide via the registry,
+but the default on modern systems is to configure short path usage per
+volume. The configuration for a volume can be queried in a number of ways,
+but these may either be unreliable or require elevated (administrator)
+privileges.
+
+Typically, the configuration for a volume can be queried using the C<fsutil>
+utility, e.g. C<fsutil 8dot3name query d:>. On the C level, it can be queried
+with a C<FSCTL_QUERY_PERSISTENT_VOLUME_STATE> request to the
+C<DeviceIOControl> API call, as described in
+L<this article|https://www.codeproject.com/Articles/304374/Query-Volume-Setting-for-State-Windows>.
+However, both of these methods require administrator privileges to work.
+
+The Win32 module does not perform any per-volume check and simply fetches
+short path names in the same manner as the underlying Windows API call it
+uses: If short path names are disabled, the call will still succeed but the
+long name will actually be returned.
+
+Note that on volumes where this happens, C<GetANSIPathName> usually cannot be
+used to return useful filenames for files that contain unicode characters.
+(In code page 65001, this may still work.) Handling unicode filenames in this
+legacy manner relies upon C<GetShortPathName> returning 8.3 filenames, but
+without short name support, it will return the filename with all unicode
+characters replaced by question mark characters.
+
 =cut
