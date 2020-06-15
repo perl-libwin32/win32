@@ -1139,8 +1139,8 @@ Currently known values for ID MAJOR MINOR and BUILD are as follows:
     Windows Server 2008 R2   2      6       1       -
     Windows 8                2      6       2       -
     Windows Server 2012      2      6       2       -
-    Windows 8.1              2      6       2       -
-    Windows Server 2012 R2   2      6       2       -
+    Windows 8.1              2      6       2/3     -
+    Windows Server 2012 R2   2      6       2/3     -
     
     Windows 10               2     10       0       -
     Windows Server 2016      2     10       0   14393
@@ -1164,6 +1164,15 @@ them.
 The version numbers for Windows 8 and Windows Server 2012 are
 identical; the PRODUCTTYPE field must be used to differentiate between
 them.
+
+The minor version number for Windows 8.1 and Windows Server 2012 R2
+depends on the running Perl version. Perl itself has been manifested
+for Windows 8.1 and Windows 10 starting from 5.24.0 (or more precisely
+from 5.23.3, if one takes development releases into account). Older
+releases of perl return the minor version as 2, while newer releases
+return it as 3. See Microsoft's L<Operating System
+Version|https://docs.microsoft.com/en-us/windows/win32/sysinfo/operating-system-version>
+documentation for more details.
 
 For modern Windows releases, the major and minor version numbers are
 identical. The PRODUCTTYPE field must be used to differentiate between
