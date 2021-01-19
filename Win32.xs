@@ -1,9 +1,12 @@
 #define WIN32_LEAN_AND_MEAN
+#define _WIN32_WINNT 0x0500
 #include <wchar.h>
 #include <wctype.h>
 #include <windows.h>
 #include <shlobj.h>
 #include <wchar.h>
+#include <userenv.h>
+#include <lm.h>
 
 #define PERL_NO_GET_CONTEXT
 #include "EXTERN.h"
@@ -22,22 +25,8 @@
 
 #define GETPROC(fn) pfn##fn = (PFN##fn)GetProcAddress(module, #fn)
 
-typedef BOOL (WINAPI *PFNSHGetSpecialFolderPathW)(HWND, WCHAR*, int, BOOL);
-typedef HRESULT (WINAPI *PFNSHGetFolderPathW)(HWND, int, HANDLE, DWORD, LPWSTR);
-typedef BOOL (WINAPI *PFNCreateEnvironmentBlock)(void**, HANDLE, BOOL);
-typedef BOOL (WINAPI *PFNDestroyEnvironmentBlock)(void*);
 typedef int (__stdcall *PFNDllRegisterServer)(void);
 typedef int (__stdcall *PFNDllUnregisterServer)(void);
-typedef DWORD (__stdcall *PFNNetApiBufferFree)(void*);
-typedef DWORD (__stdcall *PFNNetWkstaGetInfo)(LPWSTR, DWORD, void*);
-
-typedef BOOL (__stdcall *PFNOpenProcessToken)(HANDLE, DWORD, HANDLE*);
-typedef BOOL (__stdcall *PFNOpenThreadToken)(HANDLE, DWORD, BOOL, HANDLE*);
-typedef BOOL (__stdcall *PFNGetTokenInformation)(HANDLE, TOKEN_INFORMATION_CLASS, void*, DWORD, DWORD*);
-typedef BOOL (__stdcall *PFNAllocateAndInitializeSid)(PSID_IDENTIFIER_AUTHORITY, BYTE, DWORD, DWORD,
-                                                      DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, PSID*);
-typedef BOOL (__stdcall *PFNEqualSid)(PSID, PSID);
-typedef void* (__stdcall *PFNFreeSid)(PSID);
 typedef BOOL (__stdcall *PFNIsUserAnAdmin)(void);
 typedef BOOL (WINAPI *PFNGetProductInfo)(DWORD, DWORD, DWORD, DWORD, DWORD*);
 typedef void (WINAPI *PFNGetNativeSystemInfo)(LPSYSTEM_INFO lpSystemInfo);
@@ -188,55 +177,33 @@ get_unicode_env(pTHX_ const WCHAR *name)
     SV *sv = NULL;
     void *env;
     HANDLE token;
-    HMODULE module;
-    PFNOpenProcessToken pfnOpenProcessToken;
 
     /* Get security token for the current process owner */
-    module = LoadLibrary("advapi32.dll");
-    if (!module)
-        return NULL;
-
-    GETPROC(OpenProcessToken);
-
-    if (pfnOpenProcessToken == NULL ||
-        !pfnOpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &token))
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &token))
     {
-        FreeLibrary(module);
         return NULL;
     }
-    FreeLibrary(module);
 
     /* Create a Unicode environment block for this process */
-    module = LoadLibrary("userenv.dll");
-    if (module) {
-        PFNCreateEnvironmentBlock pfnCreateEnvironmentBlock;
-        PFNDestroyEnvironmentBlock pfnDestroyEnvironmentBlock;
+    if (CreateEnvironmentBlock(&env, token, FALSE))
+    {
+        size_t name_len = wcslen(name);
+        WCHAR *entry = (WCHAR *)env;
+        while (*entry) {
+            size_t i;
+            size_t entry_len = wcslen(entry);
+            BOOL equal = (entry_len > name_len) && (entry[name_len] == '=');
 
-        GETPROC(CreateEnvironmentBlock);
-        GETPROC(DestroyEnvironmentBlock);
+            for (i=0; equal && i < name_len; ++i)
+                equal = (towupper(entry[i]) == towupper(name[i]));
 
-        if (pfnCreateEnvironmentBlock && pfnDestroyEnvironmentBlock &&
-            pfnCreateEnvironmentBlock(&env, token, FALSE))
-        {
-            size_t name_len = wcslen(name);
-            WCHAR *entry = (WCHAR *)env;
-            while (*entry) {
-                size_t i;
-                size_t entry_len = wcslen(entry);
-                BOOL equal = (entry_len > name_len) && (entry[name_len] == '=');
-
-                for (i=0; equal && i < name_len; ++i)
-                    equal = (towupper(entry[i]) == towupper(name[i]));
-
-                if (equal) {
-                    sv = wstr_to_sv(aTHX_ entry+name_len+1);
-                    break;
-                }
-                entry += entry_len+1;
+            if (equal) {
+                sv = wstr_to_sv(aTHX_ entry+name_len+1);
+                break;
             }
-            pfnDestroyEnvironmentBlock(env);
+            entry += entry_len+1;
         }
-        FreeLibrary(module);
+        DestroyEnvironmentBlock(env);
     }
     CloseHandle(token);
     return sv;
@@ -367,12 +334,6 @@ XS(w32_IsAdminUser)
     dXSARGS;
     HMODULE                     module;
     PFNIsUserAnAdmin            pfnIsUserAnAdmin;
-    PFNOpenThreadToken          pfnOpenThreadToken;
-    PFNOpenProcessToken         pfnOpenProcessToken;
-    PFNGetTokenInformation      pfnGetTokenInformation;
-    PFNAllocateAndInitializeSid pfnAllocateAndInitializeSid;
-    PFNEqualSid                 pfnEqualSid;
-    PFNFreeSid                  pfnFreeSid;
     HANDLE                      hTok;
     DWORD                       dwTokInfoLen;
     TOKEN_GROUPS                *lpTokInfo;
@@ -388,88 +349,57 @@ XS(w32_IsAdminUser)
      * if the process is running with elevated privileges and not just when the
      * process owner is a member of the "Administrators" group.
      */
-    module = LoadLibrary("shell32.dll");
-    if (module) {
-        GETPROC(IsUserAnAdmin);
-        if (pfnIsUserAnAdmin) {
-            EXTEND(SP, 1);
-            ST(0) = sv_2mortal(newSViv(pfnIsUserAnAdmin() ? 1 : 0));
-            FreeLibrary(module);
-            XSRETURN(1);
-        }
-        FreeLibrary(module);
+    module = GetModuleHandleA("shell32.dll");
+    GETPROC(IsUserAnAdmin);
+    if (pfnIsUserAnAdmin) {
+        EXTEND(SP, 1);
+        ST(0) = sv_2mortal(newSViv(pfnIsUserAnAdmin() ? 1 : 0));
+        XSRETURN(1);
     }
 
-    module = LoadLibrary("advapi32.dll");
-    if (!module) {
-        warn("Cannot load advapi32.dll library");
-        XSRETURN_UNDEF;
-    }
-
-    GETPROC(OpenThreadToken);
-    GETPROC(OpenProcessToken);
-    GETPROC(GetTokenInformation);
-    GETPROC(AllocateAndInitializeSid);
-    GETPROC(EqualSid);
-    GETPROC(FreeSid);
-
-    if (!(pfnOpenThreadToken && pfnOpenProcessToken &&
-          pfnGetTokenInformation && pfnAllocateAndInitializeSid &&
-          pfnEqualSid && pfnFreeSid))
-    {
-        warn("Cannot load functions from advapi32.dll library");
-        FreeLibrary(module);
-        XSRETURN_UNDEF;
-    }
-
-    if (!pfnOpenThreadToken(GetCurrentThread(), TOKEN_QUERY, FALSE, &hTok)) {
-        if (!pfnOpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hTok)) {
+    if (!OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, FALSE, &hTok)) {
+        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hTok)) {
             warn("Cannot open thread token or process token");
-            FreeLibrary(module);
             XSRETURN_UNDEF;
         }
     }
 
-    pfnGetTokenInformation(hTok, TokenGroups, NULL, 0, &dwTokInfoLen);
+    GetTokenInformation(hTok, TokenGroups, NULL, 0, &dwTokInfoLen);
     if (!New(1, lpTokInfo, dwTokInfoLen, TOKEN_GROUPS)) {
         warn("Cannot allocate token information structure");
         CloseHandle(hTok);
-        FreeLibrary(module);
         XSRETURN_UNDEF;
     }
 
-    if (!pfnGetTokenInformation(hTok, TokenGroups, lpTokInfo, dwTokInfoLen,
+    if (!GetTokenInformation(hTok, TokenGroups, lpTokInfo, dwTokInfoLen,
             &dwTokInfoLen))
     {
         warn("Cannot get token information");
         Safefree(lpTokInfo);
         CloseHandle(hTok);
-        FreeLibrary(module);
         XSRETURN_UNDEF;
     }
 
-    if (!pfnAllocateAndInitializeSid(&NtAuth, 2, SECURITY_BUILTIN_DOMAIN_RID,
+    if (!AllocateAndInitializeSid(&NtAuth, 2, SECURITY_BUILTIN_DOMAIN_RID,
             DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &pAdminSid))
     {
         warn("Cannot allocate administrators' SID");
         Safefree(lpTokInfo);
         CloseHandle(hTok);
-        FreeLibrary(module);
         XSRETURN_UNDEF;
     }
 
     iRetVal = 0;
     for (i = 0; i < lpTokInfo->GroupCount; ++i) {
-        if (pfnEqualSid(lpTokInfo->Groups[i].Sid, pAdminSid)) {
+        if (EqualSid(lpTokInfo->Groups[i].Sid, pAdminSid)) {
             iRetVal = 1;
             break;
         }
     }
 
-    pfnFreeSid(pAdminSid);
+    FreeSid(pAdminSid);
     Safefree(lpTokInfo);
     CloseHandle(hTok);
-    FreeLibrary(module);
 
     EXTEND(SP, 1);
     ST(0) = sv_2mortal(newSViv(iRetVal));
@@ -790,7 +720,6 @@ XS(w32_GetFolderPath)
     WCHAR wpath[MAX_PATH+1];
     int folder;
     int create = 0;
-    HMODULE module;
 
     if (items != 1 && items != 2)
 	croak("usage: Win32::GetFolderPath($csidl [, $create])\n");
@@ -799,28 +728,14 @@ XS(w32_GetFolderPath)
     if (items == 2)
         create = SvTRUE(ST(1)) ? CSIDL_FLAG_CREATE : 0;
 
-    module = LoadLibrary("shfolder.dll");
-    if (module) {
-        PFNSHGetFolderPathW pfnw;
-        pfnw = (PFNSHGetFolderPathW)GetProcAddress(module, "SHGetFolderPathW");
-        if (pfnw && SUCCEEDED(pfnw(NULL, folder|create, NULL, 0, wpath))) {
-            FreeLibrary(module);
-            ST(0) = wstr_to_ansipath(aTHX_ wpath);
-            XSRETURN(1);
-        }
-        FreeLibrary(module);
+    if (SUCCEEDED(SHGetFolderPathW(NULL, folder|create, NULL, 0, wpath))) {
+        ST(0) = wstr_to_ansipath(aTHX_ wpath);
+        XSRETURN(1);
     }
 
-    module = LoadLibrary("shell32.dll");
-    if (module) {
-        PFNSHGetSpecialFolderPathW pfnw;
-        pfnw = (PFNSHGetSpecialFolderPathW)GetProcAddress(module, "SHGetSpecialFolderPathW");
-        if (pfnw && pfnw(NULL, wpath, folder, !!create)) {
-            FreeLibrary(module);
-            ST(0) = wstr_to_ansipath(aTHX_ wpath);
-            XSRETURN(1);
-        }
-        FreeLibrary(module);
+    if (SHGetSpecialFolderPathW(NULL, wpath, folder, !!create)) {
+        ST(0) = wstr_to_ansipath(aTHX_ wpath);
+        XSRETURN(1);
     }
 
     /* SHGetFolderPathW() and SHGetSpecialFolderPathW() may fail on older
@@ -1119,65 +1034,31 @@ XS(w32_NodeName)
 XS(w32_DomainName)
 {
     dXSARGS;
-    HMODULE module = LoadLibrary("netapi32.dll");
-    PFNNetApiBufferFree pfnNetApiBufferFree = NULL;
-    PFNNetWkstaGetInfo pfnNetWkstaGetInfo = NULL;
+    char dname[256];
+    DWORD dnamelen = sizeof(dname);
+    WKSTA_INFO_100 *pwi;
+    DWORD retval;
 
     if (items)
 	Perl_croak(aTHX_ "usage: Win32::DomainName()");
-    if (module) {
-        GETPROC(NetApiBufferFree);
-        GETPROC(NetWkstaGetInfo);
-    }
+
     EXTEND(SP,1);
-    if (module && pfnNetWkstaGetInfo && pfnNetApiBufferFree) {
-	/* this way is more reliable, in case user has a local account. */
-	char dname[256];
-	DWORD dnamelen = sizeof(dname);
-	struct {
-	    DWORD   wki100_platform_id;
-	    LPWSTR  wki100_computername;
-	    LPWSTR  wki100_langroup;
-	    DWORD   wki100_ver_major;
-	    DWORD   wki100_ver_minor;
-	} *pwi;
-	DWORD retval;
-	retval = pfnNetWkstaGetInfo(NULL, 100, &pwi);
-	/* NERR_Success *is* 0*/
-	if (retval == 0) {
-	    if (pwi->wki100_langroup && *(pwi->wki100_langroup)) {
-		WideCharToMultiByte(CP_ACP, 0, pwi->wki100_langroup,
-				    -1, (LPSTR)dname, dnamelen, NULL, NULL);
-	    }
-	    else {
-		WideCharToMultiByte(CP_ACP, 0, pwi->wki100_computername,
-				    -1, (LPSTR)dname, dnamelen, NULL, NULL);
-	    }
-	    pfnNetApiBufferFree(pwi);
-	    FreeLibrary(module);
-	    XSRETURN_PV(dname);
-	}
-	FreeLibrary(module);
-	SetLastError(retval);
+
+    retval = NetWkstaGetInfo(NULL, 100, (LPBYTE*)&pwi);
+    /* NERR_Success *is* 0*/
+    if (retval == 0) {
+        if (pwi->wki100_langroup && *(pwi->wki100_langroup)) {
+            WideCharToMultiByte(CP_ACP, 0, pwi->wki100_langroup,
+                                -1, (LPSTR)dname, dnamelen, NULL, NULL);
+        }
+        else {
+            WideCharToMultiByte(CP_ACP, 0, pwi->wki100_computername,
+                                -1, (LPSTR)dname, dnamelen, NULL, NULL);
+        }
+        NetApiBufferFree(pwi);
+        XSRETURN_PV(dname);
     }
-    else {
-	/* Win95 doesn't have NetWksta*(), so do it the old way */
-	char name[256];
-	DWORD size = sizeof(name);
-	if (module)
-	    FreeLibrary(module);
-	if (GetUserName(name,&size)) {
-	    char sid[ONE_K_BUFSIZE];
-	    DWORD sidlen = sizeof(sid);
-	    char dname[256];
-	    DWORD dnamelen = sizeof(dname);
-	    SID_NAME_USE snu;
-	    if (LookupAccountName(NULL, name, (PSID)&sid, &sidlen,
-				  dname, &dnamelen, &snu)) {
-		XSRETURN_PV(dname);		/* all that for this */
-	    }
-	}
-    }
+    SetLastError(retval);
     XSRETURN_UNDEF;
 }
 
