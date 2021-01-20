@@ -1233,6 +1233,25 @@ information about what you can do with this address has been lost in
 the mist of time.  Use the Win32::API module instead of this deprecated
 function.
 
+=item Win32::GetProcessPrivileges([PID])
+
+Returns a reference to a hash holding the information about the privileges
+held by the specified process. The keys are privilege names, and the values
+are booleans indicating whether a given privilege is currently enabled or not.
+
+If the optional PID parameter is omitted, the function queries the current
+process.
+
+Example return value:
+
+    {
+        SeTimeZonePrivilege => 0,
+        SeShutdownPrivilege => 0,
+        SeUndockPrivilege => 0,
+        SeIncreaseWorkingSetPrivilege => 0,
+        SeChangeNotifyPrivilege => 1
+    }
+
 =item Win32::GetProductInfo(OSMAJOR, OSMINOR, SPMAJOR, SPMINOR)
 
 Retrieves the product type for the operating system on the local

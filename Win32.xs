@@ -1557,6 +1557,92 @@ XS(w32_SetConsoleOutputCP)
     XSRETURN_IV(SetConsoleOutputCP((int)SvIV(ST(0))));
 }
 
+XS(w32_GetProcessPrivileges)
+{
+    dXSARGS;
+    BOOL ret;
+    HV *priv_hv;
+    HANDLE proc_handle, token;
+    char *priv_name = NULL;
+    TOKEN_PRIVILEGES *privs = NULL;
+    DWORD i, pid, priv_name_len = 100, privs_len = 300;
+
+    if (items > 1)
+        Perl_croak(aTHX_ "usage: Win32::GetProcessPrivileges([$pid])");
+
+    if (items == 0) {
+        EXTEND(SP, 1);
+        pid = GetCurrentProcessId();
+    }
+    else {
+        pid = (DWORD)SvUV(ST(0));
+    }
+
+    proc_handle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
+
+    if (!proc_handle)
+        XSRETURN_NO;
+
+    ret = OpenProcessToken(proc_handle, TOKEN_QUERY, &token);
+    CloseHandle(proc_handle);
+
+    if (!ret)
+        XSRETURN_NO;
+
+    do {
+        Renewc(privs, privs_len, char, TOKEN_PRIVILEGES);
+        ret = GetTokenInformation(
+            token, TokenPrivileges, privs, privs_len, &privs_len
+        );
+    } while (!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER);
+
+    CloseHandle(token);
+
+    if (!ret) {
+        Safefree(privs);
+        XSRETURN_NO;
+    }
+
+    priv_hv = newHV();
+    New(0, priv_name, priv_name_len, char);
+
+    for (i = 0; i < privs->PrivilegeCount; ++i) {
+        DWORD ret_len = 0;
+        LUID_AND_ATTRIBUTES *priv = &privs->Privileges[i];
+        BOOL is_enabled = !!(priv->Attributes & SE_PRIVILEGE_ENABLED);
+
+        if (priv->Attributes & SE_PRIVILEGE_REMOVED)
+            continue;
+
+        do {
+            ret_len = priv_name_len;
+            ret = LookupPrivilegeNameA(
+                NULL, &priv->Luid, priv_name, &ret_len
+            );
+
+            if (ret_len > priv_name_len) {
+                priv_name_len = ret_len + 1;
+                Renew(priv_name, priv_name_len, char);
+            }
+        } while (!ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER);
+
+        if (!ret) {
+            SvREFCNT_dec((SV*)priv_hv);
+            Safefree(privs);
+            Safefree(priv_name);
+            XSRETURN_NO;
+        }
+
+        hv_store(priv_hv, priv_name, ret_len, newSViv(is_enabled), 0);
+    }
+
+    Safefree(privs);
+    Safefree(priv_name);
+
+    ST(0) = sv_2mortal(newRV_noinc((SV*)priv_hv));
+    XSRETURN(1);
+}
+
 MODULE = Win32            PACKAGE = Win32
 
 PROTOTYPES: DISABLE
@@ -1626,6 +1712,7 @@ BOOT:
     newXS("Win32::GetOEMCP", w32_GetOEMCP, file);
     newXS("Win32::SetConsoleCP", w32_SetConsoleCP, file);
     newXS("Win32::SetConsoleOutputCP", w32_SetConsoleOutputCP, file);
+    newXS("Win32::GetProcessPrivileges", w32_GetProcessPrivileges, file);
 #ifdef __CYGWIN__
     newXS("Win32::SetChildShowWindow", w32_SetChildShowWindow, file);
 #endif
