@@ -13,6 +13,12 @@ my %param = (
     INSTALLDIRS   => ($] >= 5.008004 && $] < 5.012 ? 'perl' : 'site'),
 );
 $param{NO_META} = 1 if eval "$ExtUtils::MakeMaker::VERSION" >= 6.10_03;
-$param{LIBS} = ['-L/lib/w32api -lole32 -lversion'] if $^O eq "cygwin";
+
+if ($^O eq 'cygwin') {
+    $param{LIBS} = ['-L/lib/w32api -lole32 -lversion -luserenv -lnetapi32']
+}
+else {
+    $param{LIBS} = ['-luserenv']
+}
 
 WriteMakefile(%param);
