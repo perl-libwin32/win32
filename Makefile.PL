@@ -33,5 +33,6 @@ my $test_requires = $ExtUtils::MakeMaker::VERSION >= 6.64
     : 'PREREQ_PM';
 
 $param{$test_requires}{'Test'} = 0;
+$param{$test_requires}{'File::Temp'} = 0;
 
 WriteMakefile(%param);

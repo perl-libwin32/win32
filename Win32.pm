@@ -713,6 +713,27 @@ sub _GetOSName {
     return ("Win$os", $desc);
 }
 
+sub IsSymlinkCreationAllowed {
+    my(undef, $major, $minor, $build) = GetOSVersion();
+
+    # Vista was the first Windows version with symlink support
+    return !!0 if $major < 6;
+
+    # Since Windows 10 1703, enabling the developer mode allows to create
+    # symlinks regardless of process privileges
+    if ($major > 10 || ($major == 10 && ($minor > 0 || $build > 15063))) {
+        return !!1 if IsDeveloperModeEnabled();
+    }
+
+    my $privs = GetProcessPrivileges();
+
+    return !!0 unless $privs;
+
+    # It doesn't matter if the permission is enabled or not, it just has to
+    # exist. CreateSymbolicLink() will automatically enable it when needed.
+    return exists $privs->{SeCreateSymbolicLinkPrivilege};
+}
+
 # "no warnings 'redefine';" doesn't work for 5.8.7 and earlier
 local $^W = 0;
 bootstrap Win32;
@@ -1308,6 +1329,12 @@ returns 1 on Win9X.
 
 Returns true if the developer mode is currently enabled. It always returns
 false on Windows versions older than Windows 10.
+
+=item Win32::IsSymlinkCreationAllowed()
+
+Returns true if the current process is allowed to create symbolic links. This
+function is a convenience wrapper around Win32::GetProcessPrivileges() and
+Win32::IsDeveloperModeEnabled().
 
 =item Win32::IsWinNT()
 
