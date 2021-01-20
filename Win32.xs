@@ -30,6 +30,7 @@ typedef int (__stdcall *PFNDllUnregisterServer)(void);
 typedef BOOL (__stdcall *PFNIsUserAnAdmin)(void);
 typedef BOOL (WINAPI *PFNGetProductInfo)(DWORD, DWORD, DWORD, DWORD, DWORD*);
 typedef void (WINAPI *PFNGetNativeSystemInfo)(LPSYSTEM_INFO lpSystemInfo);
+typedef LONG (*PFNRegGetValueA)(HKEY, LPCSTR, LPCSTR, DWORD, LPDWORD, PVOID, LPDWORD);
 
 #ifndef CSIDL_MYMUSIC
 #   define CSIDL_MYMUSIC              0x000D
@@ -1643,6 +1644,44 @@ XS(w32_GetProcessPrivileges)
     XSRETURN(1);
 }
 
+XS(w32_IsDeveloperModeEnabled)
+{
+    dXSARGS;
+    LONG status;
+    DWORD val, val_size = sizeof(val);
+    PFNRegGetValueA pfnRegGetValueA;
+    HMODULE module;
+
+    if (items)
+        Perl_croak(aTHX_ "usage: Win32::IsDeveloperModeEnabled()");
+
+    EXTEND(SP, 1);
+
+    /* developer mode was introduced in Windows 10 */
+    if (g_osver.dwMajorVersion < 10)
+        XSRETURN_NO;
+
+    module = GetModuleHandleA("advapi32.dll");
+    GETPROC(RegGetValueA);
+    if (!pfnRegGetValueA)
+        XSRETURN_NO;
+
+    status = pfnRegGetValueA(
+        HKEY_LOCAL_MACHINE,
+        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
+        "AllowDevelopmentWithoutDevLicense",
+        RRF_RT_REG_DWORD | KEY_WOW64_64KEY,
+        NULL,
+        &val,
+        &val_size
+    );
+
+    if (status == ERROR_SUCCESS && val == 1)
+        XSRETURN_YES;
+
+    XSRETURN_NO;
+}
+
 MODULE = Win32            PACKAGE = Win32
 
 PROTOTYPES: DISABLE
@@ -1713,6 +1752,7 @@ BOOT:
     newXS("Win32::SetConsoleCP", w32_SetConsoleCP, file);
     newXS("Win32::SetConsoleOutputCP", w32_SetConsoleOutputCP, file);
     newXS("Win32::GetProcessPrivileges", w32_GetProcessPrivileges, file);
+    newXS("Win32::IsDeveloperModeEnabled", w32_IsDeveloperModeEnabled, file);
 #ifdef __CYGWIN__
     newXS("Win32::SetChildShowWindow", w32_SetChildShowWindow, file);
 #endif

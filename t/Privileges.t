@@ -4,7 +4,7 @@ use warnings;
 use Test;
 use Win32;
 
-plan tests => 4;
+plan tests => 5;
 
 ok(ref(Win32::GetProcessPrivileges) eq 'HASH');
 ok(ref(Win32::GetProcessPrivileges(Win32::GetCurrentProcessId())) eq 'HASH');
@@ -25,3 +25,8 @@ skip($skip, sub{
 
     return 1;
 });
+
+# there isn't really anything to test, we just want to make sure that the
+# function doesn't segfault
+Win32::IsDeveloperModeEnabled();
+ok(1);

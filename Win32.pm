@@ -1304,6 +1304,11 @@ actually running with elevated privileges.  Returns C<undef>
 and prints a warning if an error occurred.  This function always
 returns 1 on Win9X.
 
+=item Win32::IsDeveloperModeEnabled()
+
+Returns true if the developer mode is currently enabled. It always returns
+false on Windows versions older than Windows 10.
+
 =item Win32::IsWinNT()
 
 [CORE] Returns non zero if the Win32 subsystem is Windows NT.
