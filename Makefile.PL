@@ -11,6 +11,13 @@ my %param = (
     NAME          => 'Win32',
     VERSION_FROM  => 'Win32.pm',
     INSTALLDIRS   => ($] >= 5.008004 && $] < 5.012 ? 'perl' : 'site'),
+    PREREQ_PM     => {
+        strict => 0,
+        warnings => 0,
+        vars => 0,
+        Exporter => 0,
+        DynaLoader => 0
+    }
 );
 $param{NO_META} = 1 if eval "$ExtUtils::MakeMaker::VERSION" >= 6.10_03;
 
@@ -20,5 +27,11 @@ if ($^O eq 'cygwin') {
 else {
     $param{LIBS} = ['-luserenv']
 }
+
+my $test_requires = $ExtUtils::MakeMaker::VERSION >= 6.64
+    ? 'TEST_REQUIRES'
+    : 'PREREQ_PM';
+
+$param{$test_requires}{'Test'} = 0;
 
 WriteMakefile(%param);
