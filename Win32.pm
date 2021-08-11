@@ -8,7 +8,7 @@ package Win32;
     require DynaLoader;
 
     @ISA = qw|Exporter DynaLoader|;
-    $VERSION = '0.53';
+    $VERSION = '0.56';
     $XS_VERSION = $VERSION;
     $VERSION = eval $VERSION;
 
@@ -713,6 +713,27 @@ sub _GetOSName {
     return ("Win$os", $desc);
 }
 
+sub IsSymlinkCreationAllowed {
+    my(undef, $major, $minor, $build) = GetOSVersion();
+
+    # Vista was the first Windows version with symlink support
+    return !!0 if $major < 6;
+
+    # Since Windows 10 1703, enabling the developer mode allows to create
+    # symlinks regardless of process privileges
+    if ($major > 10 || ($major == 10 && ($minor > 0 || $build > 15063))) {
+        return !!1 if IsDeveloperModeEnabled();
+    }
+
+    my $privs = GetProcessPrivileges();
+
+    return !!0 unless $privs;
+
+    # It doesn't matter if the permission is enabled or not, it just has to
+    # exist. CreateSymbolicLink() will automatically enable it when needed.
+    return exists $privs->{SeCreateSymbolicLinkPrivilege};
+}
+
 # "no warnings 'redefine';" doesn't work for 5.8.7 and earlier
 local $^W = 0;
 bootstrap Win32;
@@ -1233,6 +1254,25 @@ information about what you can do with this address has been lost in
 the mist of time.  Use the Win32::API module instead of this deprecated
 function.
 
+=item Win32::GetProcessPrivileges([PID])
+
+Returns a reference to a hash holding the information about the privileges
+held by the specified process. The keys are privilege names, and the values
+are booleans indicating whether a given privilege is currently enabled or not.
+
+If the optional PID parameter is omitted, the function queries the current
+process.
+
+Example return value:
+
+    {
+        SeTimeZonePrivilege => 0,
+        SeShutdownPrivilege => 0,
+        SeUndockPrivilege => 0,
+        SeIncreaseWorkingSetPrivilege => 0,
+        SeChangeNotifyPrivilege => 1
+    }
+
 =item Win32::GetProductInfo(OSMAJOR, OSMINOR, SPMAJOR, SPMINOR)
 
 Retrieves the product type for the operating system on the local
@@ -1284,6 +1324,17 @@ On Windows Vista it will only return non-zero if the process is
 actually running with elevated privileges.  Returns C<undef>
 and prints a warning if an error occurred.  This function always
 returns 1 on Win9X.
+
+=item Win32::IsDeveloperModeEnabled()
+
+Returns true if the developer mode is currently enabled. It always returns
+false on Windows versions older than Windows 10.
+
+=item Win32::IsSymlinkCreationAllowed()
+
+Returns true if the current process is allowed to create symbolic links. This
+function is a convenience wrapper around Win32::GetProcessPrivileges() and
+Win32::IsDeveloperModeEnabled().
 
 =item Win32::IsWinNT()
 
@@ -1422,5 +1473,38 @@ Loads the DLL LIBRARYNAME and calls the function
 DllUnregisterServer.
 
 =back
+
+=head1 CAVEATS
+
+=head2 Short Path Names
+
+There are many situations in which modern Windows systems will not have
+the L<short path name|https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file#short-vs-long-names>
+(also called 8.3 or MS-DOS) alias for long file names available.
+
+Short path support can be configured system-wide via the registry,
+but the default on modern systems is to configure short path usage per
+volume. The configuration for a volume can be queried in a number of ways,
+but these may either be unreliable or require elevated (administrator)
+privileges.
+
+Typically, the configuration for a volume can be queried using the C<fsutil>
+utility, e.g. C<fsutil 8dot3name query d:>. On the C level, it can be queried
+with a C<FSCTL_QUERY_PERSISTENT_VOLUME_STATE> request to the
+C<DeviceIOControl> API call, as described in
+L<this article|https://www.codeproject.com/Articles/304374/Query-Volume-Setting-for-State-Windows>.
+However, both of these methods require administrator privileges to work.
+
+The Win32 module does not perform any per-volume check and simply fetches
+short path names in the same manner as the underlying Windows API call it
+uses: If short path names are disabled, the call will still succeed but the
+long name will actually be returned.
+
+Note that on volumes where this happens, C<GetANSIPathName> usually cannot be
+used to return useful filenames for files that contain unicode characters.
+(In code page 65001, this may still work.) Handling unicode filenames in this
+legacy manner relies upon C<GetShortPathName> returning 8.3 filenames, but
+without short name support, it will return the filename with all unicode
+characters replaced by question mark characters.
 
 =cut
