@@ -1472,6 +1472,12 @@ instead.
 Loads the DLL LIBRARYNAME and calls the function
 DllUnregisterServer.
 
+=item Win32::HttpGetFile(URL, FILENAME)
+
+Uses the WinHttp library to download the file specified by the URL
+parameter to the local file specified by FILENAME. Only http and https
+protocols are supported.  Authentication is not supported.
+
 =back
 
 =head1 CAVEATS
