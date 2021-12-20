@@ -1688,10 +1688,6 @@ XS(w32_HttpGetFile)
 {
     dXSARGS;
     WCHAR *url = NULL, *file = NULL, *hostName = NULL, *urlPath = NULL;
-    DWORD dwSize = 0;
-    DWORD dwDownloaded = 0;
-    DWORD dwBytesWritten = 0;
-    LPSTR pszOutBuffer;
     BOOL  bResults = FALSE;
     HINTERNET  hSession = NULL,
                hConnect = NULL,
@@ -1703,9 +1699,6 @@ XS(w32_HttpGetFile)
     DWORD error = 0;
     URL_COMPONENTS urlComp;
     LPCWSTR acceptTypes[] = { L"*/*", NULL };
-    WINHTTP_AUTOPROXY_OPTIONS  AutoProxyOptions;
-    WINHTTP_PROXY_INFO         ProxyInfo;
-    DWORD                      cbProxyInfoSize = sizeof(ProxyInfo);
 
     if (items != 2)
         croak("usage: Win32::HttpGetFile($url, $file)");
@@ -1777,6 +1770,10 @@ XS(w32_HttpGetFile)
      * configuration, which the request handle will inherit from the session).
      */
     if (hRequest) {
+        WINHTTP_AUTOPROXY_OPTIONS  AutoProxyOptions;
+        WINHTTP_PROXY_INFO         ProxyInfo;
+        DWORD                      cbProxyInfoSize = sizeof(ProxyInfo);
+
         ZeroMemory(&AutoProxyOptions, sizeof(AutoProxyOptions));
         ZeroMemory(&ProxyInfo, sizeof(ProxyInfo));
         AutoProxyOptions.dwFlags = WINHTTP_AUTOPROXY_AUTO_DETECT;
@@ -1825,42 +1822,29 @@ XS(w32_HttpGetFile)
                            FILE_ATTRIBUTE_NORMAL,
                            NULL);
 
-        if (!hOut || hOut == INVALID_HANDLE_VALUE)
+        if (hOut == INVALID_HANDLE_VALUE)
             bFileError = TRUE;
     }
 
-    /* Keep checking for data until there is nothing left. */
     if (!bFileError && bResults) {
-        do {
-            /* Check for available data. */
-            dwSize = 0;
-            if (!WinHttpQueryDataAvailable(hRequest, &dwSize)) {
-                bAborted = TRUE;
-                break;
-            }
+        DWORD dwDownloaded = 0;
+        DWORD dwBytesWritten = 0;
+        DWORD dwSize = 65536;
+        char *pszOutBuffer;
 
-            /* No more available data. */
-            if (!dwSize)
-                break;
+        New(0, pszOutBuffer, dwSize, char);
 
-            /* Allocate space for the buffer. */
-            New(0, pszOutBuffer, dwSize + 1, char);
-            if (!pszOutBuffer) {
-                bAborted = TRUE;
-                break;
-            }
-
-            /* Read the Data. */
-            ZeroMemory(pszOutBuffer, dwSize+1);
-
+        /* Keep checking for data until there is nothing left. */
+        while (1) {
             if (!WinHttpReadData(hRequest,
                                  (LPVOID)pszOutBuffer,
                                  dwSize,
                                  &dwDownloaded)) {
                 bAborted = TRUE;
-                Safefree(pszOutBuffer);
                 break;
             }
+            if (!dwDownloaded)
+                break;
 
             /* Write what we just read to the output file */
             if (!WriteFile(hOut,
@@ -1870,19 +1854,12 @@ XS(w32_HttpGetFile)
                            NULL)) {
                 bAborted = TRUE;
                 bFileError = TRUE;
-                Safefree(pszOutBuffer);
                 break;
             }
 
-            Safefree(pszOutBuffer);
-
-            /* This condition would only be reached if WinHttpQueryDataAvailable
-             * said there are more data to read but WinHttpReadData didn't get any.
-             */
-            if (!dwDownloaded)
-                break;
         }
-        while (dwSize > 0);
+
+        Safefree(pszOutBuffer);
     }
     else {
         bAborted = TRUE;
