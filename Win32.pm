@@ -1305,6 +1305,14 @@ of hex digits with surrounding braces.  For example:
 
     {09531CF1-D0C7-4860-840C-1C8C8735E2AD}
 
+=item Win32::HttpGetFile(URL, FILENAME)
+
+Uses the WinHttp library to download the file specified by the URL
+parameter to the local file specified by FILENAME. Only http and https
+protocols are supported.  Authentication is not supported.  The function
+is not available when building with gcc prior to 4.8.0 because the
+winhttp library is not available.
+
 =item Win32::InitiateSystemShutdown
 
 (MACHINE, MESSAGE, TIMEOUT, FORCECLOSE, REBOOT)
@@ -1471,12 +1479,6 @@ instead.
 
 Loads the DLL LIBRARYNAME and calls the function
 DllUnregisterServer.
-
-=item Win32::HttpGetFile(URL, FILENAME)
-
-Uses the WinHttp library to download the file specified by the URL
-parameter to the local file specified by FILENAME. Only http and https
-protocols are supported.  Authentication is not supported.
 
 =back
 

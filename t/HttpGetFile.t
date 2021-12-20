@@ -7,6 +7,11 @@ use Digest::SHA;
 my $tmpfile = "http-download-test-$$.tgz";
 END { 1 while unlink $tmpfile; }
 
+unless (defined &Win32::HttpGetFile) {
+    print "1..0 # Skip: gcc before 4.8 does not have winhttp library\n";
+    exit;
+}
+
 # We may not always have an internet connection, so don't
 # attempt remote connections unless the user has done
 #   set PERL_WIN32_INTERNET_OK=1

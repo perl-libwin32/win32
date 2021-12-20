@@ -7,7 +7,9 @@
 #include <wchar.h>
 #include <userenv.h>
 #include <lm.h>
-#include <winhttp.h>
+#if !defined(__GNUC__) || (((100000 * __GNUC__) + (1000 * __GNUC_MINOR__)) >= 408000)
+#  include <winhttp.h>
+#endif
 
 #define PERL_NO_GET_CONTEXT
 #include "EXTERN.h"
@@ -1683,6 +1685,7 @@ XS(w32_IsDeveloperModeEnabled)
     XSRETURN_NO;
 }
 
+#ifdef WINHTTPAPI
 
 XS(w32_HttpGetFile)
 {
@@ -1902,6 +1905,8 @@ XS(w32_HttpGetFile)
     XSRETURN_YES;
 }
 
+#endif
+
 MODULE = Win32            PACKAGE = Win32
 
 PROTOTYPES: DISABLE
@@ -1976,6 +1981,8 @@ BOOT:
 #ifdef __CYGWIN__
     newXS("Win32::SetChildShowWindow", w32_SetChildShowWindow, file);
 #endif
+#ifdef WINHTTPAPI
     newXS("Win32::HttpGetFile", w32_HttpGetFile, file);
+#endif
     XSRETURN_YES;
 }
