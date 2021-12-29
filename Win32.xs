@@ -1691,6 +1691,8 @@ XS(w32_HttpGetFile)
 {
     dXSARGS;
     WCHAR *url = NULL, *file = NULL, *hostName = NULL, *urlPath = NULL;
+    bool bIgnoreCertErrors = FALSE;
+    WCHAR msgbuf[ONE_K_BUFSIZE];
     BOOL  bResults = FALSE;
     HINTERNET  hSession = NULL,
                hConnect = NULL,
@@ -1698,16 +1700,21 @@ XS(w32_HttpGetFile)
     HANDLE hOut = NULL;
     BOOL   bParsed = FALSE,
            bAborted = FALSE,
-           bFileError = FALSE;
+           bFileError = FALSE,
+           bHttpError = FALSE;
     DWORD error = 0;
     URL_COMPONENTS urlComp;
     LPCWSTR acceptTypes[] = { L"*/*", NULL };
+    DWORD dwHttpStatusCode = 0, dwQuerySize = 0;
 
-    if (items != 2)
-        croak("usage: Win32::HttpGetFile($url, $file)");
+    if (items < 2 || items > 3)
+        croak("usage: Win32::HttpGetFile($url, $file[, $ignore_cert_errors])");
 
     url = sv_to_wstr(aTHX_ ST(0));
     file = sv_to_wstr(aTHX_ ST(1));
+
+    if (items == 3)
+        bIgnoreCertErrors = (BOOL)SvIV(ST(2));
 
     /* Initialize the URL_COMPONENTS structure, setting the required
      * component lengths to non-zero so that they get populated.
@@ -1766,13 +1773,29 @@ XS(w32_HttpGetFile)
                                                       ? WINHTTP_FLAG_SECURE
                                                       : 0);
 
+    /* If specified, disable certificate-related errors for https connections. */
+    if (hRequest
+        && bIgnoreCertErrors
+        && urlComp.nScheme == INTERNET_SCHEME_HTTPS) {
+        DWORD secFlags = SECURITY_FLAG_IGNORE_CERT_CN_INVALID
+                         | SECURITY_FLAG_IGNORE_CERT_DATE_INVALID
+                         | SECURITY_FLAG_IGNORE_UNKNOWN_CA
+                         | SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE;
+        if(!WinHttpSetOption(hRequest,
+                             WINHTTP_OPTION_SECURITY_FLAGS,
+                             &secFlags,
+                             sizeof(secFlags))) {
+            bAborted = TRUE;
+        }
+    }
+
     /* Call WinHttpGetProxyForUrl with our target URL. If auto-proxy succeeds,
      * then set the proxy info on the request handle. If auto-proxy fails,
      * ignore the error and attempt to send the HTTP request directly to the
      * target server (using the default WINHTTP_ACCESS_TYPE_NO_PROXY
      * configuration, which the request handle will inherit from the session).
      */
-    if (hRequest) {
+    if (hRequest && !bAborted) {
         WINHTTP_AUTOPROXY_OPTIONS  AutoProxyOptions;
         WINHTTP_PROXY_INFO         ProxyInfo;
         DWORD                      cbProxyInfoSize = sizeof(ProxyInfo);
@@ -1814,6 +1837,39 @@ XS(w32_HttpGetFile)
     /* End the request. */
     if (bResults)
         bResults = WinHttpReceiveResponse(hRequest, NULL);
+
+    /* Retrieve HTTP status code. */
+    if (bResults) {
+        dwQuerySize = sizeof(dwHttpStatusCode);
+        bResults = WinHttpQueryHeaders(hRequest,
+                                       WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                                       WINHTTP_HEADER_NAME_BY_INDEX,
+                                       &dwHttpStatusCode,
+                                       &dwQuerySize,
+                                       WINHTTP_NO_HEADER_INDEX);
+    }
+
+    /* Retrieve HTTP status text. Note this may be a success message. */
+    if (bResults) {
+        dwQuerySize = ONE_K_BUFSIZE * 2 - 2;
+        ZeroMemory(&msgbuf, ONE_K_BUFSIZE * 2);
+        bResults = WinHttpQueryHeaders(hRequest,
+                                       WINHTTP_QUERY_STATUS_TEXT,
+                                       WINHTTP_HEADER_NAME_BY_INDEX,
+                                       msgbuf,
+                                       &dwQuerySize,
+                                       WINHTTP_NO_HEADER_INDEX);
+    }
+
+    /* There is no point in successfully downloading an error page from
+     * the server, so consider HTTP errors to be failures.
+     */
+    if (bResults) {
+        if (dwHttpStatusCode < 200 || dwHttpStatusCode > 299) {
+            bResults = FALSE;
+            bHttpError = TRUE;
+        }
+    }
 
     /* Create output file for download. */
     if (bResults) {
@@ -1883,26 +1939,42 @@ XS(w32_HttpGetFile)
     Safefree(hostName);
     Safefree(urlPath);
 
-    if (bAborted) {
-        char msgbuf[ONE_K_BUFSIZE];
+    /* Retrieve system and WinHttp error messages, but not if we already
+     * got a failed HTTP status text above.
+     */
+    if (bAborted && !bHttpError) {
         DWORD msgFlags = bFileError
                          ? FORMAT_MESSAGE_FROM_SYSTEM
                          : FORMAT_MESSAGE_FROM_HMODULE;
+        msgFlags |= FORMAT_MESSAGE_IGNORE_INSERTS;
 
-        if (FormatMessageA(msgFlags,
-                           GetModuleHandleA("winhttp.dll"),
-                           error,
-                           0,
-                           msgbuf,
-                           sizeof(msgbuf) - 1,
-                           NULL)) {
-            Perl_warn(aTHX_ "Error %lu in Win32::HttpGetFile: %s", error, msgbuf);
+        ZeroMemory(&msgbuf, ONE_K_BUFSIZE * 2);
+        if (!FormatMessageW(msgFlags,
+                            GetModuleHandleW(L"winhttp.dll"),
+                            error,
+                            0,
+                            msgbuf,
+                            ONE_K_BUFSIZE - 1, /* TCHARs, not bytes */
+                            NULL)) {
+            wcsncpy(msgbuf, L"unable to format error message", ONE_K_BUFSIZE - 1);
         }
         SetLastError(error);
-        XSRETURN_NO;
     }
 
-    XSRETURN_YES;
+    if (GIMME_V == G_SCALAR) {
+        EXTEND(SP, 1);
+        ST(0) = !bAborted ? &PL_sv_yes : &PL_sv_no;
+        XSRETURN(1);
+    }
+    else if (GIMME_V == G_ARRAY) {
+        EXTEND(SP, 2);
+        ST(0) = !bAborted ? &PL_sv_yes : &PL_sv_no;
+        ST(1) = wstr_to_sv(aTHX_ msgbuf);
+        XSRETURN(2);
+    }
+    else {
+        XSRETURN_EMPTY;
+    }
 }
 
 #endif
