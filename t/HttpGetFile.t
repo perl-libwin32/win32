@@ -3,8 +3,6 @@ use warnings;
 use Test;
 use Win32;
 use Digest::SHA;
-use POSIX qw(locale_h);
-setlocale(LC_ALL, "C"); # to make error messages predictable
 
 my $tmpfile = "http-download-test-$$.tgz";
 END { 1 while unlink $tmpfile; }
@@ -13,6 +11,9 @@ unless (defined &Win32::HttpGetFile) {
     print "1..0 # Skip: gcc before 4.8 does not have winhttp library\n";
     exit;
 }
+
+# We can only verify specific error messages with a known locale.
+my $english_locale = (Win32::FormatMessage(1) eq "Incorrect function.\r\n");
 
 # We may not always have an internet connection, so don't
 # attempt remote connections unless the user has done
@@ -41,7 +42,12 @@ ok($LastError, '12005', "correct error code for invalid URL");
 
 my ($ok, $message) = HttpGetFileList('nonesuch://example.com', 'NUL:');
 ok($ok, "", "'nonesuch://' is not a real protocol");
-ok($message, "The URL does not use a recognized protocol\r\n", "correct bad protocol message");
+if ($english_locale) {
+    ok($message, "The URL does not use a recognized protocol\r\n", "correct bad protocol message");
+}
+else {
+    skip("Cannot verify error on non-English locale setting");
+}
 ok($LastError, '12006', "correct error code for unrecognized protocol with list context return");
 
 if ($ENV{PERL_WIN32_INTERNET_OK}) {
@@ -58,8 +64,12 @@ if ($ENV{PERL_WIN32_INTERNET_OK}) {
 
     my ($ok, $message) = HttpGetFileList('https://cpan.metacpan.org/authors/id/Z/ZZ/ZILCH/nonesuch.tar.gz', 'NUL:');
     ok($ok, '', 'Download of nonexistent file from real site should fail with 404');
-    ok($message, 'Not Found', 'Should get text of 404 message');
-
+    if ($english_locale) {
+        ok($message, 'Not Found', 'Should get text of 404 message');
+    }
+    else {
+        skip("Cannot verify error on non-English locale setting");
+    }
     # Since all GitHub downloads use redirects, we can test that they work.
     ok(Win32::HttpGetFile('https://github.com/perl-libwin32/win32/archive/refs/tags/v0.57.zip', $tmpfile),
        '1',
