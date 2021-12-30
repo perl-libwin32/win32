@@ -18,7 +18,7 @@ my $english_locale = (Win32::FormatMessage(1) eq "Incorrect function.\r\n");
 # We may not always have an internet connection, so don't
 # attempt remote connections unless the user has done
 #   set PERL_WIN32_INTERNET_OK=1
-plan tests => $ENV{PERL_WIN32_INTERNET_OK} ? 13 : 7;
+plan tests => $ENV{PERL_WIN32_INTERNET_OK} ? 19 : 7;
 
 # On Cygwin the test_harness will invoke additional Win32 APIs that
 # will reset the Win32::GetLastError() value, so capture it immediately.
@@ -82,4 +82,20 @@ if ($ENV{PERL_WIN32_INTERNET_OK}) {
     ok($sha->hexdigest,
        '9d282e2292e67fb2e25422dfb190474e30a38de3',
        "downloaded GitHub zip archive has correct digest");
+
+    ok(HttpGetFile('https://self-signed.badssl.com/index.html', 'NUL:'),
+       '',
+       'Cannot download from site with self-signed cert without ignoring cert errors');
+    ok($LastError, '12175', "correct code for ERROR_WINHTTP_SECURE_FAILURE with self-signed certificate");
+    ok(HttpGetFile('https://self-signed.badssl.com/index.html', 'NUL:', 1),
+       '1',
+       'Can download from site with self-signed cert using ignore cert errors parameter');
+
+    ok(HttpGetFile('https://expired.badssl.com/index.html', 'NUL:'),
+       '',
+       'Cannot download from site with expired cert without ignoring cert errors');
+    ok($LastError, '12175', "correct code for ERROR_WINHTTP_SECURE_FAILURE with expired certificate");
+    ok(HttpGetFile('https://expired.badssl.com/index.html', 'NUL:', 1),
+       '1',
+       'Can download from site with expired cert using ignore cert errors parameter');
 }
