@@ -18,7 +18,7 @@ my $english_locale = (Win32::FormatMessage(1) eq "Incorrect function.\r\n");
 # We may not always have an internet connection, so don't
 # attempt remote connections unless the user has done
 #   set PERL_WIN32_INTERNET_OK=1
-plan tests => $ENV{PERL_WIN32_INTERNET_OK} ? 12 : 7;
+plan tests => $ENV{PERL_WIN32_INTERNET_OK} ? 13 : 7;
 
 # On Cygwin the test_harness will invoke additional Win32 APIs that
 # will reset the Win32::GetLastError() value, so capture it immediately.
@@ -71,7 +71,15 @@ if ($ENV{PERL_WIN32_INTERNET_OK}) {
         skip("Cannot verify error on non-English locale setting");
     }
     # Since all GitHub downloads use redirects, we can test that they work.
+    1 while unlink $tmpfile;
     ok(Win32::HttpGetFile('https://github.com/perl-libwin32/win32/archive/refs/tags/v0.57.zip', $tmpfile),
        '1',
        "successfully downloaded a zipball via redirect");
+
+    $sha = undef;
+    $sha = Digest::SHA->new('sha1');
+    $sha->addfile($tmpfile, 'b');
+    ok($sha->hexdigest,
+       '9d282e2292e67fb2e25422dfb190474e30a38de3',
+       "downloaded GitHub zip archive has correct digest");
 }
