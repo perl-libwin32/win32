@@ -18,7 +18,7 @@ my $english_locale = (Win32::FormatMessage(1) eq "Incorrect function.\r\n");
 # We may not always have an internet connection, so don't
 # attempt remote connections unless the user has done
 #   set PERL_WIN32_INTERNET_OK=1
-plan tests => $ENV{PERL_WIN32_INTERNET_OK} ? 19 : 7;
+plan tests => $ENV{PERL_WIN32_INTERNET_OK} ? 20 : 7;
 
 # On Cygwin the test_harness will invoke additional Win32 APIs that
 # will reset the Win32::GetLastError() value, so capture it immediately.
@@ -64,6 +64,7 @@ if ($ENV{PERL_WIN32_INTERNET_OK}) {
 
     my ($ok, $message) = HttpGetFileList('https://cpan.metacpan.org/authors/id/Z/ZZ/ZILCH/nonesuch.tar.gz', 'NUL:');
     ok($ok, '', 'Download of nonexistent file from real site should fail with 404');
+    ok($LastError - 1e9, '404', 'Correct 404 HTTP status for not found');
     if ($english_locale) {
         ok($message, 'Not Found', 'Should get text of 404 message');
     }
@@ -76,7 +77,6 @@ if ($ENV{PERL_WIN32_INTERNET_OK}) {
        '1',
        "successfully downloaded a zipball via redirect");
 
-    $sha = undef;
     $sha = Digest::SHA->new('sha1');
     $sha->addfile($tmpfile, 'b');
     ok($sha->hexdigest,

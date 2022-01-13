@@ -1939,26 +1939,33 @@ XS(w32_HttpGetFile)
     Safefree(hostName);
     Safefree(urlPath);
 
-    /* Retrieve system and WinHttp error messages, but not if we already
-     * got a failed HTTP status text above.
+    /* Retrieve system and WinHttp error messages, or compose a user-defined
+     * error code if we got a failed HTTP status text above.  Conveniently, adding
+     * 1e9 to the HTTP status sets bit 29, denoting a user-defined error code,
+     * and also makes it easy to lop off the upper part and just get HTTP status.
      */
-    if (bAborted && !bHttpError) {
-        DWORD msgFlags = bFileError
-                         ? FORMAT_MESSAGE_FROM_SYSTEM
-                         : FORMAT_MESSAGE_FROM_HMODULE;
-        msgFlags |= FORMAT_MESSAGE_IGNORE_INSERTS;
-
-        ZeroMemory(&msgbuf, ONE_K_BUFSIZE * 2);
-        if (!FormatMessageW(msgFlags,
-                            GetModuleHandleW(L"winhttp.dll"),
-                            error,
-                            0,
-                            msgbuf,
-                            ONE_K_BUFSIZE - 1, /* TCHARs, not bytes */
-                            NULL)) {
-            wcsncpy(msgbuf, L"unable to format error message", ONE_K_BUFSIZE - 1);
+    if (bAborted) {
+        if (bHttpError) {
+            SetLastError(dwHttpStatusCode + 1000000000);
         }
-        SetLastError(error);
+        else {
+            DWORD msgFlags = bFileError
+                            ? FORMAT_MESSAGE_FROM_SYSTEM
+                            : FORMAT_MESSAGE_FROM_HMODULE;
+            msgFlags |= FORMAT_MESSAGE_IGNORE_INSERTS;
+
+            ZeroMemory(&msgbuf, ONE_K_BUFSIZE * 2);
+            if (!FormatMessageW(msgFlags,
+                                GetModuleHandleW(L"winhttp.dll"),
+                                error,
+                                0,
+                                msgbuf,
+                                ONE_K_BUFSIZE - 1, /* TCHARs, not bytes */
+                                NULL)) {
+                wcsncpy(msgbuf, L"unable to format error message", ONE_K_BUFSIZE - 1);
+            }
+            SetLastError(error);
+        }
     }
 
     if (GIMME_V == G_SCALAR) {

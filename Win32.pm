@@ -1322,7 +1322,8 @@ context also returns, in addition to the boolean status, a second
 value containing message text related to the status.
 
 If the call fails, C<Win32::GetLastError()> will return a numeric
-error code, which may be either a system error or a WinHttp error.
+error code, which may be a system error, a WinHttp error, or a
+user-defined error composed of 1e9 plus the HTTP status code.
 
 Scalar context example:
 
@@ -1339,6 +1340,10 @@ List context example:
     }
     else {
         print "Failure!: $msg\n";
+        my $err = Win32::GetLastError();
+        if ($err > 1e9) {
+            printf "HTTP status: %d\n", ($err - 1e9);
+        }
     }
 
 =item Win32::InitiateSystemShutdown
