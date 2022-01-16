@@ -1928,6 +1928,12 @@ XS(w32_HttpGetFile)
     if (bAborted)
         error = GetLastError();
 
+    /* If we successfully opened the output file but failed later, mark
+     * the file for deletion.
+     */
+    if (bAborted && hOut != INVALID_HANDLE_VALUE)
+        (void) DeleteFileW(file);
+
     /* Close any open handles. */
     if (hOut) CloseHandle(hOut);
     if (hRequest) WinHttpCloseHandle(hRequest);
