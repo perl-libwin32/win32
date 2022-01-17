@@ -1697,7 +1697,7 @@ XS(w32_HttpGetFile)
     HINTERNET  hSession = NULL,
                hConnect = NULL,
                hRequest = NULL;
-    HANDLE hOut = NULL;
+    HANDLE hOut = INVALID_HANDLE_VALUE;
     BOOL   bParsed = FALSE,
            bAborted = FALSE,
            bFileError = FALSE,
@@ -1935,7 +1935,7 @@ XS(w32_HttpGetFile)
         (void) DeleteFileW(file);
 
     /* Close any open handles. */
-    if (hOut) CloseHandle(hOut);
+    if (hOut != INVALID_HANDLE_VALUE) CloseHandle(hOut);
     if (hRequest) WinHttpCloseHandle(hRequest);
     if (hConnect) WinHttpCloseHandle(hConnect);
     if (hSession) WinHttpCloseHandle(hSession);
