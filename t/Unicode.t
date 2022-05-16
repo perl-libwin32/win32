@@ -1,5 +1,4 @@
 use strict;
-use Test;
 use Config qw(%Config);
 use Cwd qw(cwd);
 use Encode qw();
@@ -27,6 +26,8 @@ BEGIN {
     }
 }
 
+use Test::More tests => 12;
+
 my $home = Win32::GetCwd();
 my $cwd  = cwd(); # may be a Cygwin path
 my $dir  = "Foo \x{394}\x{419} Bar \x{5E7}\x{645} Baz";
@@ -43,8 +44,6 @@ sub cleanup {
 cleanup();
 END { cleanup() }
 
-plan test => 12;
-
 # Create Unicode directory
 Win32::CreateDirectory($dir);
 ok(-d Win32::GetANSIPathName($dir));
@@ -60,7 +59,7 @@ while ($_ = readdir($dh)) {
     # On Cygwin 1.7 readdir() returns the utf8 representation of the
     # filename but doesn't turn on the SvUTF8 bit
     Encode::_utf8_on($_) if $^O eq "cygwin" && $Config{osvers} !~ /^1.5/;
-    ok($file, Win32::GetLongPathName("$dir\\$_"));
+    is($file, Win32::GetLongPathName("$dir\\$_"));
 }
 closedir($dh);
 
@@ -68,7 +67,7 @@ closedir($dh);
 my $full = Win32::GetFullPathName($dir);
 my $long = Win32::GetLongPathName($full);
 
-ok($long, Win32::GetLongPathName($home)."\\$dir");
+is($long, Win32::GetLongPathName($home)."\\$dir");
 
 # We can Win32::SetCwd() into the Unicode directory
 ok(Win32::SetCwd($dir));
@@ -80,9 +79,9 @@ my $subdir = cwd();
 # change back to home directory to make sure relative paths
 # in @INC continue to work
 ok(chdir($home));
-ok(Win32::GetCwd(), $home);
+is(Win32::GetCwd(), $home);
 
-ok(Win32::GetLongPathName($w32dir), $long);
+is(Win32::GetLongPathName($w32dir), $long);
 
 # cwd() on Cygwin returns a mapped path that we need to translate
 # back to a Windows path. Invoking `cygpath` on $subdir doesn't work.
@@ -90,9 +89,13 @@ if ($^O eq "cygwin") {
     $subdir = Cygwin::posix_to_win_path($subdir, 1);
 }
 $subdir =~ s,/,\\,g;
-# Cygwin64 no longer returns an ANSI name
-skip($^O eq "cygwin", Win32::GetLongPathName($subdir), $long);
+SKIP: {
+    skip 'Cygwin64 no longer returns an ANSI name', 1
+        if $^O eq "cygwin";
+
+    is(Win32::GetLongPathName($subdir), $long);
+}
 
 # We can chdir() into the Unicode directory if we use the ANSI name
 ok(chdir(Win32::GetANSIPathName($dir)));
-ok(Win32::GetLongPathName(Win32::GetCwd()), $long);
+is(Win32::GetLongPathName(Win32::GetCwd()), $long);
