@@ -1667,6 +1667,10 @@ XS(w32_GetProcessPrivileges)
     XSRETURN(1);
 }
 
+#ifndef RRF_SUBKEY_WOW6464KEY
+#  define RRF_SUBKEY_WOW6464KEY 0x00010000
+#endif
+
 XS(w32_IsDeveloperModeEnabled)
 {
     dXSARGS;
@@ -1693,7 +1697,7 @@ XS(w32_IsDeveloperModeEnabled)
         HKEY_LOCAL_MACHINE,
         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock",
         "AllowDevelopmentWithoutDevLicense",
-        RRF_RT_REG_DWORD | KEY_WOW64_64KEY,
+        RRF_RT_REG_DWORD | RRF_SUBKEY_WOW6464KEY,
         NULL,
         &val,
         &val_size
