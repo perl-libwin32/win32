@@ -25,7 +25,7 @@ if ($^O eq 'cygwin') {
     $param{LIBS} = ['-L/lib/w32api -lole32 -lversion -luserenv -lnetapi32 -lwinhttp']
 }
 else {
-    $param{LIBS} = ['-luserenv -lwinhttp']
+    $param{LIBS} = [':nosearch -luserenv -lwinhttp']
 }
 
 my $test_requires = $ExtUtils::MakeMaker::VERSION >= 6.64
