@@ -102,6 +102,10 @@ typedef LONG (WINAPI *PFNRegGetValueA)(HKEY, LPCSTR, LPCSTR, DWORD, LPDWORD, PVO
 #   define CSIDL_FLAG_CREATE          0x8000
 #endif
 
+#ifndef RRF_SUBKEY_WOW6464KEY
+#  define RRF_SUBKEY_WOW6464KEY 0x00010000
+#endif
+
 /* Use explicit struct definition because wSuiteMask and
  * wProductType are not defined in the VC++ 6.0 headers.
  * WORD type has been replaced by unsigned short because
@@ -1666,10 +1670,6 @@ XS(w32_GetProcessPrivileges)
     ST(0) = sv_2mortal(newRV_noinc((SV*)priv_hv));
     XSRETURN(1);
 }
-
-#ifndef RRF_SUBKEY_WOW6464KEY
-#  define RRF_SUBKEY_WOW6464KEY 0x00010000
-#endif
 
 XS(w32_IsDeveloperModeEnabled)
 {
