@@ -560,7 +560,7 @@ sub _GetOSName {
 	elsif ($major == 10) {
             if ($producttype == VER_NT_WORKSTATION) {
                 # Build numbers from https://en.wikipedia.org/wiki/Windows_10_version_history
-                $os = '10';
+                $os = $build < 22000 ? '10' : '11';
                 if (9841 <= $build && $build <= 10240) {
                     $desc = " Version 1507";
                     $desc .= " (Preview Build $build)" if $build < 10240;
