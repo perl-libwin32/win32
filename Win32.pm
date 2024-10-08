@@ -1200,7 +1200,7 @@ Currently known values for ID MAJOR MINOR and BUILD are as follows:
 
     Windows 10               2     10       0       -
     Windows Server 2016      2     10       0   14393
-    Windows Server 2019      2     10       0   17677
+    Windows Server 2019      2     10       0   17763
 
 On Windows NT 4 SP6 and later this function returns the following
 additional values: SPMAJOR, SPMINOR, SUITEMASK, PRODUCTTYPE.
