@@ -370,7 +370,7 @@ sub GetOSDisplayName {
 		$desc =~ s/^\s*//;
 		s/(200.)/$name Server $1/;
 	    }
-	    s/^Windows (20(03|08|12|16|19))/Windows Server $1/;
+	    s/^Windows (20(03|08|12|16|19|22))/Windows Server $1/;
             s/^Windows SAC/Windows Server/;
 	}
     }

@@ -181,7 +181,7 @@ sub check {
     # and 2003/2008 start with "Windows Server"
     unless ($pretty eq "Win32s") {
 	my $prefix = "Windows";
-	$prefix .= " Server" if $pretty =~ /^20(03|08|12|16|19)/;
+	$prefix .= " Server" if $pretty =~ /^20(03|08|12|16|19|22)/;
 	$pretty = "$prefix $pretty";
     }
 
