@@ -559,8 +559,10 @@ sub _GetOSName {
         }
 	elsif ($major == 10) {
             if ($producttype == VER_NT_WORKSTATION) {
-                # Build numbers from https://en.wikipedia.org/wiki/Windows_10_version_history
                 $os = $build < 22000 ? '10' : '11';
+
+                # Build numbers from https://en.wikipedia.org/wiki/Windows_10_version_history
+                # windows 10
                 if (9841 <= $build && $build <= 10240) {
                     $desc = " Version 1507";
                     $desc .= " (Preview Build $build)" if $build < 10240;
@@ -613,24 +615,18 @@ sub _GetOSName {
                     $desc = " Version 22H2 (2022 Update)";
                 }
                 # Build numbers from https://en.wikipedia.org/wiki/Windows_11_version_history
-                elsif ($build >= 22000) {
-                    # windows 11
-                    $os = '11';
-                    if ($build == 22000) {
-                        $desc = " Version 21H2 (2021 Update)";
-                    }
-                    elsif ($build == 22621) {
-                        $desc = " Version 22H2 (2022 Update)";
-                    }
-                    elsif ($build == 22631) {
-                        $desc = " Version 23H2 (2023 Update)";
-                    }
-                    elsif ($build == 26100) {
-                        $desc = " Version 24H2 (2024 Update)";
-                    }
-                    else {
-                        $desc = " Build $build";
-                    }
+                # windows 11
+                elsif ($build == 22000) {
+                    $desc = " Version 21H2 (2021 Update)";
+                }
+                elsif ($build == 22621) {
+                    $desc = " Version 22H2 (2022 Update)";
+                }
+                elsif ($build == 22631) {
+                    $desc = " Version 23H2 (2023 Update)";
+                }
+                elsif ($build == 26100) {
+                    $desc = " Version 24H2 (2024 Update)";
                 }
                 else {
                     $desc = " Build $build";
