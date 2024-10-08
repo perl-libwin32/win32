@@ -150,6 +150,10 @@ my @win10_tests = (
 # The 1809 version from the semi-annual channel will identify as "Windows Server 2019 Version 1809"
 #["Server [Version 1809]",                                 "Server",  2, 10, 0, 0x07, 2, 0, 17763],
 ["Server [Version 1903]",                                  "Server",  2, 10, 0, 0x07, 2, 0, 18362],
+["Server [Version 1909]",                                  "Server",  2, 10, 0, 0x07, 2, 0, 18363],
+["Server [Version 2004]",                                  "Server",  2, 10, 0, 0x07, 2, 0, 19041],
+["Server [Version 20H2]",                                  "Server",  2, 10, 0, 0x07, 2, 0, 19042],
+["Server [Version 23H2]",                                  "Server",  2, 10, 0, 0x07, 2, 0, 25398],
 ["Server [Build 12345]",                                   "Server",  2, 10, 0, 0x07, 2, 0, 12345],
 
 );

@@ -617,6 +617,9 @@ sub _GetOSName {
                 }
             }
             else {
+                # Build numbers from  https://en.wikipedia.org/wiki/List_of_Microsoft_Windows_versions
+                # https://learn.microsoft.com/en-us/windows-server/get-started/servicing-channels-comparison#annual-channel-ac
+                # Long-Term Servicing Channel (LTSC)
                 if ($build == 14393) {
                     $os = "2016";
                     $desc = "Version 1607";
@@ -626,6 +629,7 @@ sub _GetOSName {
                     $desc = "Version 1809";
                 }
                 else {
+                    # (Semi) Annual Channel (AC)
                     $os = "Server";
                     if ($build == 16299) {
                         $desc = "Version 1709";
@@ -635,6 +639,18 @@ sub _GetOSName {
                     }
                     elsif ($build == 18362) {
                         $desc = "Version 1903";
+                    }
+                    elsif ($build == 18363) {
+                        $desc = "Version 1909";
+                    }
+                    elsif ($build == 19041) {
+                        $desc = "Version 2004";
+                    }
+                    elsif ($build == 19042) {
+                        $desc = "Version 20H2";
+                    }
+                    elsif ($build == 25398) {
+                        $desc = "Version 23H2";
                     }
                     else {
                         $desc = "Build $build";
