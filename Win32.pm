@@ -628,6 +628,10 @@ sub _GetOSName {
                     $os = "2019";
                     $desc = "Version 1809";
                 }
+                elsif ($build == 20348) {
+                    $os = "2022";
+                    $desc = "Version 21H2";
+                }
                 else {
                     # (Semi) Annual Channel (AC)
                     $os = "Server";
@@ -1162,6 +1166,7 @@ Currently the possible values for the OS name are
     Win10
     Win2016
     Win2019
+    Win2022
     WinSAC
 
 This routine is just a simple interface into GetOSVersion().  More
@@ -1217,6 +1222,7 @@ Currently known values for ID MAJOR MINOR and BUILD are as follows:
     Windows 10               2     10       0       -
     Windows Server 2016      2     10       0   14393
     Windows Server 2019      2     10       0   17763
+    Windows Server 2022      2     10       0   20348
 
 On Windows NT 4 SP6 and later this function returns the following
 additional values: SPMAJOR, SPMINOR, SUITEMASK, PRODUCTTYPE.
