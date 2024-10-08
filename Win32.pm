@@ -612,6 +612,26 @@ sub _GetOSName {
                 elsif ($build == 19045) {
                     $desc = " Version 22H2 (2022 Update)";
                 }
+                # Build numbers from https://en.wikipedia.org/wiki/Windows_11_version_history
+                elsif ($build >= 22000) {
+                    # windows 11
+                    $os = '11';
+                    if ($build == 22000) {
+                        $desc = " Version 21H2 (2021 Update)";
+                    }
+                    elsif ($build == 22621) {
+                        $desc = " Version 22H2 (2022 Update)";
+                    }
+                    elsif ($build == 22631) {
+                        $desc = " Version 23H2 (2023 Update)";
+                    }
+                    elsif ($build == 26100) {
+                        $desc = " Version 24H2 (2024 Update)";
+                    }
+                    else {
+                        $desc = " Build $build";
+                    }
+                }
                 else {
                     $desc = " Build $build";
                 }
@@ -1167,6 +1187,7 @@ Currently the possible values for the OS name are
     Win2016
     Win2019
     Win2022
+    Win11
     WinSAC
 
 This routine is just a simple interface into GetOSVersion().  More
@@ -1223,6 +1244,7 @@ Currently known values for ID MAJOR MINOR and BUILD are as follows:
     Windows Server 2016      2     10       0   14393
     Windows Server 2019      2     10       0   17763
     Windows Server 2022      2     10       0   20348
+    Windows 11               2     10       0       -
 
 On Windows NT 4 SP6 and later this function returns the following
 additional values: SPMAJOR, SPMINOR, SUITEMASK, PRODUCTTYPE.
