@@ -594,6 +594,24 @@ sub _GetOSName {
                     $desc = " Version 1903 (May 2019 Update)";
                     $desc .= " (Preview Build $build)" if $build < 18362;
                 }
+                elsif ($build == 18363) {
+                    $desc = " Version 1909 (November 2019 Update)";
+                }
+                elsif ($build == 19041) {
+                    $desc = " Version 2004 (May 2020 Update)";
+                }
+                elsif ($build == 19042) {
+                    $desc = " Version 20H2 (October 2020 Update)";
+                }
+                elsif ($build == 19043) {
+                    $desc = " Version 21H1 (May 2021 Update)";
+                }
+                elsif ($build == 19044) {
+                    $desc = " Version 21H2 (November 2021 Update)";
+                }
+                elsif ($build == 19045) {
+                    $desc = " Version 22H2 (2022 Update)";
+                }
                 else {
                     $desc = " Build $build";
                 }
@@ -1179,11 +1197,11 @@ Currently known values for ID MAJOR MINOR and BUILD are as follows:
     Windows Server 2012      2      6       2       -
     Windows 8.1              2      6       2/3     -
     Windows Server 2012 R2   2      6       2/3     -
-    
+
     Windows 10               2     10       0       -
     Windows Server 2016      2     10       0   14393
     Windows Server 2019      2     10       0   17677
-    
+
 On Windows NT 4 SP6 and later this function returns the following
 additional values: SPMAJOR, SPMINOR, SUITEMASK, PRODUCTTYPE.
 

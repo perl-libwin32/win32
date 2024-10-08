@@ -135,6 +135,13 @@ my @win10_tests = (
 ["10 [Version 1903 (May 2019 Update) (Preview Build 18204)]",      "10", 2, 10, 0, 0x00, 0, 0, 18204],
 ["10 [Version 1903 (May 2019 Update)]",                            "10", 2, 10, 0, 0x00, 0, 0, 18362],
 
+["10 [Version 1909 (November 2019 Update)]",                       "10", 2, 10, 0, 0x00, 0, 0, 18363],
+["10 [Version 2004 (May 2020 Update)]",                            "10", 2, 10, 0, 0x00, 0, 0, 19041],
+["10 [Version 20H2 (October 2020 Update)]",                        "10", 2, 10, 0, 0x00, 0, 0, 19042],
+["10 [Version 21H1 (May 2021 Update)]",                            "10", 2, 10, 0, 0x00, 0, 0, 19043],
+["10 [Version 21H2 (November 2021 Update)]",                       "10", 2, 10, 0, 0x00, 0, 0, 19044],
+["10 [Version 22H2 (2022 Update)]",                                "10", 2, 10, 0, 0x00, 0, 0, 19045],
+
 ["2016 [Version 1607]",                                    "2016",    2, 10, 0, 0x07, 2, 0, 14393],
 ["2019 [Version 1809]",                                    "2019",    2, 10, 0, 0x07, 2, 0, 17763],
 
@@ -209,4 +216,3 @@ sub check {
 check($_, Win32::PROCESSOR_ARCHITECTURE_INTEL) for @intel_tests, @dual_tests, @win10_tests;
 check($_, Win32::PROCESSOR_ARCHITECTURE_AMD64) for @amd64_tests, @dual_tests;
 check($_, Win32::PROCESSOR_ARCHITECTURE_IA64)  for @ia64_tests;
-
