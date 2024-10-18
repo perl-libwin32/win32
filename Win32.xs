@@ -26,6 +26,19 @@
 #  define WC_NO_BEST_FIT_CHARS 0x00000400
 #endif
 
+#ifdef WINHTTPAPI
+
+#define MY_CXT_KEY "Win32::Win32pm_guts"
+typedef struct {
+    HMODULE winhttp;
+} my_cxt_t;
+
+START_MY_CXT
+
+XS(w32_HttpGetFile);
+
+#endif
+
 #define GETPROC(fn) pfn##fn = (PFN##fn)GetProcAddress(module, #fn)
 
 typedef int (__stdcall *PFNDllRegisterServer)(void);
@@ -34,6 +47,137 @@ typedef BOOL (__stdcall *PFNIsUserAnAdmin)(void);
 typedef BOOL (WINAPI *PFNGetProductInfo)(DWORD, DWORD, DWORD, DWORD, DWORD*);
 typedef void (WINAPI *PFNGetNativeSystemInfo)(LPSYSTEM_INFO lpSystemInfo);
 typedef LONG (WINAPI *PFNRegGetValueA)(HKEY, LPCSTR, LPCSTR, DWORD, LPDWORD, PVOID, LPDWORD);
+
+#ifdef WINHTTPAPI
+
+typedef BOOL (__stdcall * PFNWinHttpCrackUrl) (
+LPCWSTR pwszUrl,
+DWORD dwUrlLength,
+DWORD dwFlags,
+LPURL_COMPONENTS lpUrlComponents
+);
+
+typedef HINTERNET (__stdcall * PFNWinHttpOpen) (
+LPCWSTR pszAgentW,
+DWORD dwAccessType,
+LPCWSTR pszProxyW,
+LPCWSTR pszProxyBypassW,
+DWORD dwFlags
+);
+
+typedef BOOL (__stdcall * PFNWinHttpCloseHandle) (
+HINTERNET hInternet
+);
+
+typedef HINTERNET (__stdcall * PFNWinHttpConnect) (
+HINTERNET hSession,
+LPCWSTR pswzServerName,
+INTERNET_PORT nServerPort,
+DWORD dwReserved
+);
+
+typedef BOOL (__stdcall * PFNWinHttpReadData) (
+HINTERNET hRequest,
+LPVOID lpBuffer,
+DWORD dwNumberOfBytesToRead,
+LPDWORD lpdwNumberOfBytesRead
+);
+
+typedef BOOL (__stdcall * PFNWinHttpSetOption) (
+HINTERNET hInternet,
+DWORD dwOption,
+LPVOID lpBuffer,
+DWORD dwBufferLength
+);
+
+typedef HINTERNET (__stdcall * PFNWinHttpOpenRequest) (
+HINTERNET hConnect,
+LPCWSTR pwszVerb,
+LPCWSTR pwszObjectName,
+LPCWSTR pwszVersion,
+LPCWSTR pwszReferrer OPTIONAL,
+LPCWSTR FAR * ppwszAcceptTypes,
+DWORD dwFlags
+);
+
+typedef BOOL (__stdcall * PFNWinHttpAddRequestHeaders) (
+HINTERNET hRequest,
+LPCWSTR lpszHeaders,
+DWORD dwHeadersLength,
+DWORD dwModifiers
+);
+
+typedef BOOL (__stdcall * PFNWinHttpSendRequest) (
+HINTERNET hRequest,
+LPCWSTR lpszHeaders,
+DWORD dwHeadersLength,
+LPVOID lpOptional,
+DWORD dwOptionalLength,
+DWORD dwTotalLength,
+DWORD_PTR dwContext
+);
+
+typedef BOOL (__stdcall * PFNWinHttpReceiveResponse) (
+HINTERNET hRequest,
+LPVOID lpReserved
+);
+
+typedef BOOL (__stdcall * PFNWinHttpQueryHeaders) (
+ HINTERNET hRequest,
+ DWORD dwInfoLevel,
+ LPCWSTR   pwszName,
+ LPVOID lpBuffer,
+ LPDWORD   lpdwBufferLength,
+ LPDWORD   lpdwIndex
+);
+
+typedef BOOL (__stdcall * PFNWinHttpGetProxyForUrl) (
+    HINTERNET                   hSession,
+    LPCWSTR                     lpcwszUrl,
+    WINHTTP_AUTOPROXY_OPTIONS * pAutoProxyOptions,
+    WINHTTP_PROXY_INFO *        pProxyInfo
+);
+
+volatile LONG WinHttpRefCnt = 0;
+volatile LONG WinHttpLoaded = 0;
+PFNWinHttpCrackUrl pfnWinHttpCrackUrl = NULL;
+PFNWinHttpOpen pfnWinHttpOpen = NULL;
+PFNWinHttpCloseHandle pfnWinHttpCloseHandle = NULL;
+PFNWinHttpConnect pfnWinHttpConnect = NULL;
+PFNWinHttpReadData pfnWinHttpReadData = NULL;
+PFNWinHttpSetOption pfnWinHttpSetOption = NULL;
+PFNWinHttpOpenRequest pfnWinHttpOpenRequest = NULL;
+PFNWinHttpAddRequestHeaders pfnWinHttpAddRequestHeaders = NULL;
+PFNWinHttpSendRequest pfnWinHttpSendRequest = NULL;
+PFNWinHttpReceiveResponse pfnWinHttpReceiveResponse = NULL;
+PFNWinHttpQueryHeaders pfnWinHttpQueryHeaders = NULL;
+PFNWinHttpGetProxyForUrl pfnWinHttpGetProxyForUrl = NULL;
+
+
+static void DecRefWinHttp() {
+    LONG old = InterlockedDecrement(&WinHttpRefCnt);
+    if(old == 0) {
+        old = InterlockedExchange(&WinHttpLoaded,1);
+        if(old != 1) {
+          pfnWinHttpCrackUrl = NULL;
+          pfnWinHttpOpen = NULL;
+          pfnWinHttpCloseHandle = NULL;
+          pfnWinHttpConnect = NULL;
+          pfnWinHttpReadData = NULL;
+          pfnWinHttpSetOption = NULL;
+          pfnWinHttpOpenRequest = NULL;
+          pfnWinHttpAddRequestHeaders = NULL;
+          pfnWinHttpSendRequest = NULL;
+          pfnWinHttpReceiveResponse = NULL;
+          pfnWinHttpQueryHeaders = NULL;
+          pfnWinHttpGetProxyForUrl = NULL;
+          InterlockedExchange(&WinHttpLoaded,0);
+        }
+    }
+}
+
+#endif
+
 
 #ifndef CSIDL_MYMUSIC
 #   define CSIDL_MYMUSIC              0x000D
@@ -1705,7 +1849,117 @@ XS(w32_IsDeveloperModeEnabled)
     XSRETURN_NO;
 }
 
+XS(w32_CLONE)
+{
+    dXSARGS;
 #ifdef WINHTTPAPI
+    HMODULE h;
+    WCHAR buf [MAX_PATH*2]; /* times 2 why not? 32KB paths one day lol*/
+
+    {
+        MY_CXT_CLONE; /* a redundant memcpy() on this line */
+        h = MY_CXT.winhttp;
+        if(h) { /* bump ref count on dll */
+            InterlockedIncrement(&WinHttpRefCnt);
+            if(!GetModuleFileNameW(h, (WCHAR *)buf, (sizeof(buf)/sizeof(WCHAR))-1)) {
+                DecRefWinHttp();
+                Perl_croak_nocontext("Win32.pm WinHttp DLL load failed %u", GetLastError());
+            }
+            h = LoadLibraryW((WCHAR *)buf);
+            MY_CXT.winhttp = h;
+            if(!h) {
+                DecRefWinHttp();
+                Perl_croak_nocontext("Win32.pm WinHttp DLL load failed %u", GetLastError());
+            }
+        }
+    }
+#endif
+}
+
+XS(w32_END)
+{
+    dXSARGS;
+    SP = MARK;
+    PUTBACK;
+#ifdef WINHTTPAPI
+    {
+        dMY_CXT;
+        HMODULE h = MY_CXT.winhttp;
+        if(h) {
+            MY_CXT.winhttp = NULL;
+            DecRefWinHttp();
+            FreeLibrary(h);
+        }
+    }
+#endif
+}
+
+#ifdef WINHTTPAPI
+
+XS(w32_StubLoadWinHttp) {
+    HMODULE module;
+    LONG old;
+    old = InterlockedCompareExchange(&WinHttpLoaded, 1, 0);
+    if(old) {
+        retry:
+        if(old == 1) {
+            Sleep(1);
+            old = WinHttpLoaded;
+            goto retry;
+        }
+        else if(old == 2) {
+            InterlockedIncrement(&WinHttpRefCnt);
+            module = LoadLibraryW(L"winhttp");
+            if(!module) {
+                DecRefWinHttp();
+                Perl_croak_nocontext("Win32.pm WinHttp DLL load failed %u", GetLastError());
+            }
+            else {
+                dMY_CXT;
+                MY_CXT.winhttp = module;
+                CvXSUB(cv) = w32_HttpGetFile;
+                w32_HttpGetFile(aTHX_ cv);
+                return;
+            }
+        }
+        else {
+            Perl_croak_nocontext("Win32.pm WinHttp thread race load failure state %u", old);
+        }
+    }
+    InterlockedIncrement(&WinHttpRefCnt);
+    module = LoadLibraryW(L"winhttp");
+    if(!module) {
+        InterlockedExchange(&WinHttpLoaded, 3);
+        DecRefWinHttp();
+        InterlockedExchange(&WinHttpLoaded, 3);
+        Perl_croak_nocontext("Win32.pm WinHttp DLL load failed %u", GetLastError());
+    }
+    GETPROC(WinHttpCrackUrl);
+    GETPROC(WinHttpOpen);
+    GETPROC(WinHttpCloseHandle);
+    GETPROC(WinHttpConnect);
+    GETPROC(WinHttpReadData);
+    GETPROC(WinHttpSetOption);
+    GETPROC(WinHttpOpenRequest);
+    GETPROC(WinHttpAddRequestHeaders);
+    GETPROC(WinHttpSendRequest);
+    GETPROC(WinHttpReceiveResponse);
+    GETPROC(WinHttpQueryHeaders);
+    GETPROC(WinHttpGetProxyForUrl);
+    old = InterlockedExchange(&WinHttpLoaded, 2);
+    if(old != 1) {
+        DecRefWinHttp();
+        FreeLibrary(module);
+        Perl_croak_nocontext("Win32.pm WinHttp thread race load failure state %u", old);
+    }
+    else {
+        dMY_CXT;
+        MY_CXT.winhttp = module;
+        CvXSUB(cv) = w32_HttpGetFile;
+        w32_HttpGetFile(aTHX_ cv);
+        return;
+    }
+}
 
 XS(w32_HttpGetFile)
 {
@@ -1747,7 +2001,7 @@ XS(w32_HttpGetFile)
     urlComp.dwExtraInfoLength = (DWORD)-1;
 
     /* Parse the URL. */
-    bParsed = WinHttpCrackUrl(url, (DWORD)wcslen(url), 0, &urlComp);
+    bParsed = pfnWinHttpCrackUrl(url, (DWORD)wcslen(url), 0, &urlComp);
 
     /* Only support http and htts, not ftp, gopher, etc. */
     if (bParsed
@@ -1767,7 +2021,7 @@ XS(w32_HttpGetFile)
         urlPath[urlComp.dwUrlPathLength + urlComp.dwExtraInfoLength] = 0;
 
         /* Use WinHttpOpen to obtain a session handle. */
-        hSession = WinHttpOpen(L"Perl",
+        hSession = pfnWinHttpOpen(L"Perl",
                                WINHTTP_ACCESS_TYPE_NO_PROXY,
                                WINHTTP_NO_PROXY_NAME,
                                WINHTTP_NO_PROXY_BYPASS,
@@ -1776,14 +2030,14 @@ XS(w32_HttpGetFile)
 
     /* Specify an HTTP server. */
     if (hSession)
-        hConnect = WinHttpConnect(hSession,
+        hConnect = pfnWinHttpConnect(hSession,
                                   hostName,
                                   urlComp.nPort,
                                   0);
 
     /* Create an HTTP request handle. */
     if (hConnect)
-        hRequest = WinHttpOpenRequest(hConnect,
+        hRequest = pfnWinHttpOpenRequest(hConnect,
                                       L"GET",
                                       urlPath,
                                       NULL,
@@ -1801,7 +2055,7 @@ XS(w32_HttpGetFile)
                          | SECURITY_FLAG_IGNORE_CERT_DATE_INVALID
                          | SECURITY_FLAG_IGNORE_UNKNOWN_CA
                          | SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE;
-        if(!WinHttpSetOption(hRequest,
+        if(!pfnWinHttpSetOption(hRequest,
                              WINHTTP_OPTION_SECURITY_FLAGS,
                              &secFlags,
                              sizeof(secFlags))) {
@@ -1828,11 +2082,11 @@ XS(w32_HttpGetFile)
                                     WINHTTP_AUTO_DETECT_TYPE_DNS_A;
         AutoProxyOptions.fAutoLogonIfChallenged = TRUE;
 
-        if(WinHttpGetProxyForUrl(hSession,
+        if(pfnWinHttpGetProxyForUrl(hSession,
                                 url,
                                 &AutoProxyOptions,
                                 &ProxyInfo)) {
-            if(!WinHttpSetOption(hRequest,
+            if(!pfnWinHttpSetOption(hRequest,
                                 WINHTTP_OPTION_PROXY,
                                 &ProxyInfo,
                                 cbProxyInfoSize)) {
@@ -1846,7 +2100,7 @@ XS(w32_HttpGetFile)
 
     /* Send a request. */
     if (hRequest && !bAborted)
-        bResults = WinHttpSendRequest(hRequest,
+        bResults = pfnWinHttpSendRequest(hRequest,
                                       WINHTTP_NO_ADDITIONAL_HEADERS,
                                       0,
                                       WINHTTP_NO_REQUEST_DATA,
@@ -1856,12 +2110,12 @@ XS(w32_HttpGetFile)
 
     /* End the request. */
     if (bResults)
-        bResults = WinHttpReceiveResponse(hRequest, NULL);
+        bResults = pfnWinHttpReceiveResponse(hRequest, NULL);
 
     /* Retrieve HTTP status code. */
     if (bResults) {
         dwQuerySize = sizeof(dwHttpStatusCode);
-        bResults = WinHttpQueryHeaders(hRequest,
+        bResults = pfnWinHttpQueryHeaders(hRequest,
                                        WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
                                        WINHTTP_HEADER_NAME_BY_INDEX,
                                        &dwHttpStatusCode,
@@ -1873,7 +2127,7 @@ XS(w32_HttpGetFile)
     if (bResults) {
         dwQuerySize = ONE_K_BUFSIZE * 2 - 2;
         ZeroMemory(&msgbuf, ONE_K_BUFSIZE * 2);
-        bResults = WinHttpQueryHeaders(hRequest,
+        bResults = pfnWinHttpQueryHeaders(hRequest,
                                        WINHTTP_QUERY_STATUS_TEXT,
                                        WINHTTP_HEADER_NAME_BY_INDEX,
                                        msgbuf,
@@ -1915,7 +2169,7 @@ XS(w32_HttpGetFile)
 
         /* Keep checking for data until there is nothing left. */
         while (1) {
-            if (!WinHttpReadData(hRequest,
+            if (!pfnWinHttpReadData(hRequest,
                                  (LPVOID)pszOutBuffer,
                                  dwSize,
                                  &dwDownloaded)) {
@@ -1956,9 +2210,9 @@ XS(w32_HttpGetFile)
 
     /* Close any open handles. */
     if (hOut != INVALID_HANDLE_VALUE) CloseHandle(hOut);
-    if (hRequest) WinHttpCloseHandle(hRequest);
-    if (hConnect) WinHttpCloseHandle(hConnect);
-    if (hSession) WinHttpCloseHandle(hSession);
+    if (hRequest) pfnWinHttpCloseHandle(hRequest);
+    if (hConnect) pfnWinHttpCloseHandle(hConnect);
+    if (hSession) pfnWinHttpCloseHandle(hSession);
 
     Safefree(url);
     Safefree(file);
@@ -2088,7 +2342,10 @@ BOOT:
     newXS("Win32::SetChildShowWindow", w32_SetChildShowWindow, file);
 #endif
 #ifdef WINHTTPAPI
-    newXS("Win32::HttpGetFile", w32_HttpGetFile, file);
+    newXS("Win32::HttpGetFile", w32_StubLoadWinHttp, file);
+    newXS("Win32::CLONE", w32_CLONE, file);
+    newXS("Win32::END", w32_END, file);
+    MY_CXT_INIT;
 #endif
     XSRETURN_YES;
 }
