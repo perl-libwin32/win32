@@ -20,6 +20,37 @@
 #  define countof(array) (sizeof (array) / sizeof (*(array)))
 #endif
 
+/* 128KB minus some breathing room to actually touch/alloc/vivify 128KB, only
+   right under that amount. We don't want byte 0x20000 to be alloced or
+   writeable since 4096-1 will be wasted.
+
+   "alloca((_l)+PTRSIZE)" guards against off-by-one, and
+   writing a ASCII or WIDE NULL into theoretical unalloced mem.
+   If the croak executes, something is really wrong, since the entire Win32
+   revolves around struct UNICODE_STRING and its USHORT Length field.
+   Depending on WinOS version, MS API bugs, legacy behaviour, and specific
+   API func name, 0x7FFF or 0xFFFF is max legal input.
+
+   Lets just cap this API at 0xFFFF-PTRSIZE, unless a good reason is found
+   to delivery a 0xFFFF long string to the Win API.
+
+   128KB limit allows about 2 ASCII strings, or 1 WIDE string at almost
+   MAX LEN. And you can combine 2 buffers into 1 chkstk()/alloca() func call.
+
+   128KB limit is also to prevent too much C stack expansion/vivify
+   and anti-abuse, since the C stack wont shrink after expansion, and Win32
+   default limit is 1 MB.
+
+   If production code hits the croak, it needs to be refactored with a
+   C stack buf initial buf len MAX_PATH+1, or 4096 initial length.
+   If API retval failure/buf overflow error, then
+   do a "FetchLength(NULL, &my_strlen)", and "malloc()" something and retry,
+   or if string length in context is unreasonable, do a "croak()".
+*/
+#define SAFE_ALLOCA(_l,_t) ((_l)*sizeof(_t) > (((0xFFFF-PTRSIZE)*2)-PTRSIZE) ? \
+    (croak_sub_glr(cv, "alloca", ERROR_BUFFER_OVERFLOW),NULL) \
+    : alloca(((_l)*sizeof(_t))+PTRSIZE))
+
 #define SE_SHUTDOWN_NAMEA   "SeShutdownPrivilege"
 
 #ifndef WC_NO_BEST_FIT_CHARS
@@ -49,6 +80,19 @@ typedef void (WINAPI *PFNGetNativeSystemInfo)(LPSYSTEM_INFO lpSystemInfo);
 typedef LONG (WINAPI *PFNRegGetValueA)(HKEY, LPCSTR, LPCSTR, DWORD, LPDWORD, PVOID, LPDWORD);
 
 #ifdef WINHTTPAPI
+
+/* Pump perl's event loop as a good citizen, Win32 GUIs or SIG ALRM
+   GetTickCount() is extremely fast but slow updates (15 ms or worse) since it
+   fetchs a value from shared RO global kernel memory, but 30 ms or 60 ms
+   resolution is much more than we need.  If GetTickCount() overflows after
+   45 days (don't ask how that happened), because unsigned comparison,
+   conditional still triggers, new time stored, and hgf_async_check() runs
+   1x only, needlessly, at less than every 333 ms. */
+#define HGF_ASYNC_CHECK if( (cur = GetTickCount())-last > 333 \
+                            || PL_sig_pending) {\
+    last = cur; \
+    hgf_async_check(aTHX); \
+}
 
 typedef BOOL (__stdcall * PFNWinHttpCrackUrl) (
 LPCWSTR pwszUrl,
@@ -153,6 +197,74 @@ PFNWinHttpReceiveResponse pfnWinHttpReceiveResponse = NULL;
 PFNWinHttpQueryHeaders pfnWinHttpQueryHeaders = NULL;
 PFNWinHttpGetProxyForUrl pfnWinHttpGetProxyForUrl = NULL;
 
+typedef struct {
+    HINTERNET hSession;
+    HINTERNET hConnect;
+    HINTERNET hRequest;
+    WCHAR *file;
+    HANDLE hOut;
+} HGF_DTOR_T;
+
+typedef struct {
+    WINHTTP_AUTOPROXY_OPTIONS  AutoProxyOptions;
+    WINHTTP_PROXY_INFO         ProxyInfo;
+} HGF_PXYINFO_T;
+
+static int hgf_free(pTHX_ SV* sv, MAGIC* mg) {
+    HANDLE h;
+    WCHAR *file;
+    DWORD e = GetLastError();
+    HGF_DTOR_T * dtor = (HGF_DTOR_T *)mg->mg_ptr;
+    HINTERNET hi = dtor->hRequest;
+    if(hi) {
+      dtor->hRequest = NULL;
+      pfnWinHttpCloseHandle(hi);
+    }
+    hi = dtor->hConnect;
+    if(hi) {
+      dtor->hConnect = NULL;
+      pfnWinHttpCloseHandle(hi);
+    }
+    hi = dtor->hSession;
+    if(hi) {
+      dtor->hSession = NULL;
+      pfnWinHttpCloseHandle(hi);
+    }
+    h = dtor->hOut;
+    if(h != INVALID_HANDLE_VALUE) {
+      dtor->hOut = INVALID_HANDLE_VALUE;
+      CloseHandle(h);
+      if(dtor->file) {
+          DeleteFileW(dtor->file);
+      }
+    }
+    file = dtor->file;
+    if(file) {
+      dtor->file = NULL;
+      Safefree(file);
+    }
+    SetLastError(e);
+    return 0;
+}
+
+static int hgf_dup(pTHX_ MAGIC *mg, CLONE_PARAMS *param) {
+    /* nothing can survive a ithread/psuedofork, no WinHttpDuplicateHandle() */
+    HGF_DTOR_T * dtor = (HGF_DTOR_T *)mg->mg_ptr;
+    dtor->hRequest = NULL;
+    dtor->hConnect = NULL;
+    dtor->hSession = NULL;
+    dtor->file = NULL;
+    dtor->hOut = INVALID_HANDLE_VALUE;
+    return 0;
+}
+
+const MGVTBL hgf_mg_vtbl = { 0, 0, 0, 0, hgf_free, 0, hgf_dup, 0 };
+
+static void hgf_async_check(pTHX) {
+    DWORD e = GetLastError();
+    win32_async_check(aTHX);
+    SetLastError(e);
+}
 
 static void DecRefWinHttp() {
     LONG old = InterlockedDecrement(&WinHttpRefCnt);
@@ -266,37 +378,119 @@ struct g_osver_t {
 } g_osver = {0, 0, 0, 0, 0, "", 0, 0, 0, 0, 0};
 BOOL g_osver_ex = TRUE;
 
+/* Croak with XSUB's name prefixed, taken from croak_xs_usage */
+#define croak_sub(_cv, _pv) S_croak_sub((_cv), (_pv))
+STATIC void
+S_croak_sub(const CV *const cv, const char *const params)
+{
+/* This executes so rarely, avoid overhead of passing my_perl in callers. */
+    dTHX;
+    const GV *const gv = CvGV(cv);
+
+    if (gv) {
+        const char *const gvname = GvNAME(gv);
+        const HV *const stash = GvSTASH(gv);
+        const char *const hvname = stash ? HvNAME(stash) : NULL;
+
+        if (hvname)
+          Perl_croak_nocontext("%s::%s: %s", hvname, gvname, params);
+        else
+          Perl_croak_nocontext("%s: %s", gvname, params);
+    } else {
+        /* Pants. I don't think that it should be possible to get here. */
+        Perl_croak_nocontext("CODE(0x%" UVxf "): %s", PTR2UV(cv), params);
+    }
+}
+
+/* Croak with XSUB's name prefixed, taken from croak_xs_usage */
+#define croak_sub_glr(_cv, _syscallpv, _e) S_croak_sub_glr((_cv), (_syscallpv), (_e))
+STATIC void
+S_croak_sub_glr(const CV *const cv, const char *const syscallpv, DWORD err)
+{
+    char buf [128+sizeof("%s GetLastError=%u %x ")+12+9];
+    my_snprintf((char *)buf, sizeof(buf)-1, "%s GetLastError=%u %x ",
+                syscallpv, err, err);
+    croak_sub(cv, (const char *)buf);
+}
+
 #define ONE_K_BUFSIZE	1024
 
 /* Convert SV to wide character string.  The return value must be
  * freed using Safefree().
  */
-WCHAR*
-sv_to_wstr(pTHX_ SV *sv)
+static WCHAR*
+sv_to_wstr_len(pTHX_ const CV *const cv, SV *sv, STRLEN *plen)
 {
     DWORD wlen;
     WCHAR *wstr;
     STRLEN len;
+    DWORD e;
     char *str = SvPV(sv, len);
     UINT cp = SvUTF8(sv) ? CP_UTF8 : CP_ACP;
+    DWORD wlen_guess = len + 1;
 
-    wlen = MultiByteToWideChar(cp, 0, str, (int)(len+1), NULL, 0);
-    New(0, wstr, wlen, WCHAR);
-    MultiByteToWideChar(cp, 0, str, (int)(len+1), wstr, wlen);
+    New(0, wstr, wlen_guess, WCHAR);
+    if (len == 0) { /* output WIDE string is obvious */
+        *plen = 0;
+        wstr[0] = 0;
+        return wstr;
+    }
 
+    wlen = MultiByteToWideChar(cp, 0, str, (int)(len+1), wstr, wlen_guess);
+    if(wlen == 0) {
+        e = GetLastError();
+        if(e == ERROR_INSUFFICIENT_BUFFER) { /* not BMP ??? */
+            wlen = MultiByteToWideChar(cp, 0, str, (int)(len+1), NULL, 0);
+            if(wlen == 0) /* probably illegal code point in some code page */
+                goto croak;
+            wlen++;
+            Renew(wstr, wlen, WCHAR);
+            wlen = MultiByteToWideChar(cp, 0, str, (int)(len+1), wstr, wlen);
+            if (wlen == 0) { /* unknown err, but we have no output */
+                goto croak;
+            }
+            *plen = wlen-1;
+            return wstr;
+        }
+        else /* probably illegal code point in some code page */
+            goto croak_err;
+    }
+    *plen = wlen-1;
     return wstr;
+
+    croak:
+    e = GetLastError();
+
+    croak_err:
+    Safefree(wstr);
+    croak_sub_glr(cv, "MultiByteToWideChar", e);
+}
+
+static WCHAR*
+sv_to_wstr(pTHX_ const CV *const cv, SV *sv) {
+    STRLEN len;
+    return sv_to_wstr_len(aTHX_ cv, sv, &len);
 }
 
 /* Convert wide character string to mortal SV.  Use UTF8 encoding
  * if the string cannot be represented in the system codepage.
+ * Arg len is in units of WCHAR not including WIDE null, just like MS APIs.
+ * Arg len IS NOT in units of bytes. If len is 0, wcslen() is called instead.
  */
 SV *
-wstr_to_sv(pTHX_ WCHAR *wstr)
+wstr_to_sv(pTHX_ WCHAR *wstr, STRLEN len)
 {
-    int wlen = (int)wcslen(wstr)+1;
+    /* 2 GB-1 max, do len = 0 on overflow instead of croak for now, too rare */
+    int wlen =  len ?
+        ((((int)len) < 0 || len > (0x7FFFFFFF-1)) ? 1 : ((int)len)+1)
+        : ((int)wcslen(wstr)+1);
     BOOL use_default = FALSE;
-    int len = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, wstr, wlen, NULL, 0, NULL, NULL);
-    SV *sv = sv_2mortal(newSV(len));
+    SV *sv;
+    if(wlen == 1) { /* empty string */
+      return sv_2mortal(newSVpvs(""));
+    }
+    len = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, wstr, wlen, NULL, 0, NULL, NULL);
+    sv = sv_2mortal(newSV(len));
 
     len = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, wstr, wlen, SvPVX(sv), len, NULL, &use_default);
     if (use_default) {
@@ -346,7 +540,7 @@ get_unicode_env(pTHX_ const WCHAR *name)
                 equal = (towupper(entry[i]) == towupper(name[i]));
 
             if (equal) {
-                sv = wstr_to_sv(aTHX_ entry+name_len+1);
+                sv = wstr_to_sv(aTHX_ entry+name_len+1, 0);
                 break;
             }
             entry += entry_len+1;
@@ -470,9 +664,9 @@ XS(w32_ExpandEnvironmentStrings)
     if (items != 1)
 	croak("usage: Win32::ExpandEnvironmentStrings($String)");
 
-    source = sv_to_wstr(aTHX_ ST(0));
+    source = sv_to_wstr(aTHX_ cv, ST(0));
     ExpandEnvironmentStringsW(source, value, countof(value)-1);
-    ST(0) = wstr_to_sv(aTHX_ value);
+    ST(0) = wstr_to_sv(aTHX_ value, 0);
     Safefree(source);
     XSRETURN(1);
 }
@@ -713,11 +907,11 @@ XS(w32_MsgBox)
     if (items < 1 || items > 3)
 	croak("usage: Win32::MsgBox($message [, $flags [, $title]])");
 
-    msg = sv_to_wstr(aTHX_ ST(0));
+    msg = sv_to_wstr(aTHX_ cv, ST(0));
     if (items > 1)
         flags = (DWORD)SvIV(ST(1));
     if (items > 2)
-        title = sv_to_wstr(aTHX_ ST(2));
+        title = sv_to_wstr(aTHX_ cv, ST(2));
 
     result = MessageBoxW(GetActiveWindow(), msg, title ? title : L"Perl", flags);
 
@@ -1110,7 +1304,7 @@ XS(w32_SetCwd)
 	Perl_croak(aTHX_ "usage: Win32::SetCwd($cwd)");
 
     if (SvUTF8(ST(0))) {
-        WCHAR *wide = sv_to_wstr(aTHX_ ST(0));
+        WCHAR *wide = sv_to_wstr(aTHX_ cv, ST(0));
         char *ansi = my_ansipath(wide);
         int rc = PerlDir_chdir(ansi);
         Safefree(wide);
@@ -1175,7 +1369,7 @@ XS(w32_LoginName)
     EXTEND(SP,1);
 
     if (GetUserNameW(name, &size)) {
-        ST(0) = wstr_to_sv(aTHX_ name);
+        ST(0) = wstr_to_sv(aTHX_ name, 0);
         XSRETURN(1);
     }
 
@@ -1380,12 +1574,12 @@ XS(w32_GetShortPathName)
     if (items != 1)
 	Perl_croak(aTHX_ "usage: Win32::GetShortPathName($longPathName)");
 
-    wlong = sv_to_wstr(aTHX_ ST(0));
+    wlong = sv_to_wstr(aTHX_ cv, ST(0));
     len = GetShortPathNameW(wlong, wshort, countof(wshort));
     Safefree(wlong);
 
     if (len && len < sizeof(wshort)) {
-        ST(0) = wstr_to_sv(aTHX_ wshort);
+        ST(0) = wstr_to_sv(aTHX_ wshort, 0);
         XSRETURN(1);
     }
 
@@ -1413,7 +1607,7 @@ XS(w32_GetFullPathName)
 
 #if __CYGWIN__ || !defined(PERL_IMPLICIT_SYS)
     {
-        WCHAR *filename = sv_to_wstr(aTHX_ ST(0));
+        WCHAR *filename = sv_to_wstr(aTHX_ cv, ST(0));
         WCHAR full[2*MAX_PATH];
         DWORD len = GetFullPathNameW(filename, countof(full), full, NULL);
         Safefree(filename);
@@ -1432,7 +1626,7 @@ XS(w32_GetFullPathName)
      * XXX from UTF8 into the current codepage.
      */
     if (SvUTF8(ST(0))) {
-        WCHAR *filename = sv_to_wstr(aTHX_ ST(0));
+        WCHAR *filename = sv_to_wstr(aTHX_ cv, ST(0));
         WCHAR *mappedname = PerlDir_mapW(filename);
         Safefree(filename);
         ansi = fullname = my_ansipath(mappedname);
@@ -1496,14 +1690,14 @@ XS(w32_GetLongPathName)
     if (items != 1)
 	Perl_croak(aTHX_ "usage: Win32::GetLongPathName($pathname)");
 
-    wstr = sv_to_wstr(aTHX_ ST(0));
+    wstr = sv_to_wstr(aTHX_ cv, ST(0));
 
     if (wcslen(wstr) < (size_t)countof(wide_path)) {
         wcscpy(wide_path, wstr);
         long_path = my_longpathW(wide_path);
         if (long_path) {
             Safefree(wstr);
-            ST(0) = wstr_to_sv(aTHX_ long_path);
+            ST(0) = wstr_to_sv(aTHX_ long_path, 0);
             XSRETURN(1);
         }
     }
@@ -1519,7 +1713,7 @@ XS(w32_GetANSIPathName)
     if (items != 1)
 	Perl_croak(aTHX_ "usage: Win32::GetANSIPathName($pathname)");
 
-    wide_path = sv_to_wstr(aTHX_ ST(0));
+    wide_path = sv_to_wstr(aTHX_ cv, ST(0));
     ST(0) = wstr_to_ansipath(aTHX_ wide_path);
     Safefree(wide_path);
     XSRETURN(1);
@@ -1561,7 +1755,7 @@ XS(w32_OutputDebugString)
 	Perl_croak(aTHX_ "usage: Win32::OutputDebugString($string)");
 
     if (SvUTF8(ST(0))) {
-        WCHAR *str = sv_to_wstr(aTHX_ ST(0));
+        WCHAR *str = sv_to_wstr(aTHX_ cv, ST(0));
         OutputDebugStringW(str);
         Safefree(str);
     }
@@ -1598,7 +1792,7 @@ XS(w32_CreateDirectory)
 	Perl_croak(aTHX_ "usage: Win32::CreateDirectory($dir)");
 
     if (SvUTF8(ST(0))) {
-        WCHAR *dir = sv_to_wstr(aTHX_ ST(0));
+        WCHAR *dir = sv_to_wstr(aTHX_ cv, ST(0));
         result = CreateDirectoryW(dir, NULL);
         Safefree(dir);
     }
@@ -1619,7 +1813,7 @@ XS(w32_CreateFile)
 	Perl_croak(aTHX_ "usage: Win32::CreateFile($file)");
 
     if (SvUTF8(ST(0))) {
-        WCHAR *file = sv_to_wstr(aTHX_ ST(0));
+        WCHAR *file = sv_to_wstr(aTHX_ cv, ST(0));
         handle = CreateFileW(file, GENERIC_WRITE, FILE_SHARE_WRITE,
                              NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
         Safefree(file);
@@ -1964,7 +2158,11 @@ XS(w32_StubLoadWinHttp) {
 XS(w32_HttpGetFile)
 {
     dXSARGS;
+    U8 gimme_v;
+    MAGIC * mg;
+    HGF_DTOR_T * dtor;
     WCHAR *url = NULL, *file = NULL, *hostName = NULL, *urlPath = NULL;
+    STRLEN url_len, file_len;
     bool bIgnoreCertErrors = FALSE;
     WCHAR msgbuf[ONE_K_BUFSIZE];
     BOOL  bResults = FALSE;
@@ -1977,18 +2175,38 @@ XS(w32_HttpGetFile)
            bFileError = FALSE,
            bHttpError = FALSE;
     DWORD error = 0;
+    DWORD cur = 0;
+    DWORD last = 0;
     URL_COMPONENTS urlComp;
-    LPCWSTR acceptTypes[] = { L"*/*", NULL };
+    static const LPCWSTR acceptTypes[] = { L"*/*", NULL };
     DWORD dwHttpStatusCode = 0, dwQuerySize = 0;
 
+    msgbuf[0] = '\0'; /* only first WCHAR, not entire buf, don't = {0} */
     if (items < 2 || items > 3)
-        croak("usage: Win32::HttpGetFile($url, $file[, $ignore_cert_errors])");
+        croak_xs_usage(cv, "url, file [, ignore_cert_errors]");
+    mg  = sv_magicext(  sv_newmortal(), NULL, PERL_MAGIC_ext, &hgf_mg_vtbl,
+                        NULL, 0);
+    New(0, dtor, 1 , HGF_DTOR_T);
+    mg->mg_ptr = (char *)dtor;
+    mg->mg_len = sizeof(HGF_DTOR_T);
+    mg->mg_flags |= MGf_DUP;
+    /* init struct with empty values */
+    hgf_dup(aTHX_ mg, NULL);
 
-    url = sv_to_wstr(aTHX_ ST(0));
-    file = sv_to_wstr(aTHX_ ST(1));
-
-    if (items == 3)
-        bIgnoreCertErrors = (BOOL)SvIV(ST(2));
+    XSprePUSH;
+    SP++;
+    url = sv_to_wstr_len(aTHX_ cv, *SP, &url_len);
+    SAVEFREEPV(url);
+    SP++;
+    dtor->file = file = sv_to_wstr_len(aTHX_ cv, *SP, &file_len);
+    if (items == 3) {
+        SP++;
+        bIgnoreCertErrors = (BOOL)SvIV(*SP);
+    }
+    /* rewind SP, prep stack for retvals later, dont need incoming SV*s anymore */
+    XSprePUSH;
+    /* paranoia, no PP callbacks or maybe PL stack realloc API calls, but w/e */
+    PUTBACK;
 
     /* Initialize the URL_COMPONENTS structure, setting the required
      * component lengths to non-zero so that they get populated.
@@ -2001,7 +2219,7 @@ XS(w32_HttpGetFile)
     urlComp.dwExtraInfoLength = (DWORD)-1;
 
     /* Parse the URL. */
-    bParsed = pfnWinHttpCrackUrl(url, (DWORD)wcslen(url), 0, &urlComp);
+    bParsed = pfnWinHttpCrackUrl(url, (DWORD)url_len, 0, &urlComp);
 
     /* Only support http and htts, not ftp, gopher, etc. */
     if (bParsed
@@ -2012,14 +2230,24 @@ XS(w32_HttpGetFile)
     }
 
     if (bParsed) {
-        New(0, hostName,  urlComp.dwHostNameLength + 1, WCHAR);
-        wcsncpy(hostName, urlComp.lpszHostName, urlComp.dwHostNameLength);
-        hostName[urlComp.dwHostNameLength] = 0;
+        hostName = SAFE_ALLOCA(urlComp.dwHostNameLength + 1
+                    + urlComp.dwUrlPathLength + urlComp.dwExtraInfoLength + 1,
+                    WCHAR);
+        Move( urlComp.lpszHostName, hostName,
+              urlComp.dwHostNameLength, WCHAR);
+        urlPath = hostName+urlComp.dwHostNameLength;
+        urlPath[0] = '\0';
+        urlPath++;
 
-        New(0, urlPath,  urlComp.dwUrlPathLength + urlComp.dwExtraInfoLength + 1, WCHAR);
-        wcsncpy(urlPath, urlComp.lpszUrlPath, urlComp.dwUrlPathLength + urlComp.dwExtraInfoLength);
-        urlPath[urlComp.dwUrlPathLength + urlComp.dwExtraInfoLength] = 0;
+        /* Note shortcut, we assume NOTHING is removed in URL
+         * "/Acme-Module-0.1.tar.gz?sessionid=12345" between "tar.gz" and "?".
+         * We don't use the urlComp.lpszExtraInfo WCHAR *, but we are using
+         * urlComp.dwExtraInfoLength length */
+        Move( urlComp.lpszUrlPath, urlPath,
+              urlComp.dwUrlPathLength + urlComp.dwExtraInfoLength, WCHAR);
+        urlPath[urlComp.dwUrlPathLength + urlComp.dwExtraInfoLength] = '\0';
 
+        /* XXX Add perl version to UA or metadata is bad? */
         /* Use WinHttpOpen to obtain a session handle. */
         hSession = pfnWinHttpOpen(L"Perl",
                                WINHTTP_ACCESS_TYPE_NO_PROXY,
@@ -2029,23 +2257,33 @@ XS(w32_HttpGetFile)
     }
 
     /* Specify an HTTP server. */
-    if (hSession)
+    if (hSession) {
+        dtor->hSession = hSession;
         hConnect = pfnWinHttpConnect(hSession,
                                   hostName,
                                   urlComp.nPort,
                                   0);
+    }
 
+    HGF_ASYNC_CHECK;
     /* Create an HTTP request handle. */
-    if (hConnect)
+    if (hConnect) {
+        dtor->hConnect = hConnect;
         hRequest = pfnWinHttpOpenRequest(hConnect,
                                       L"GET",
                                       urlPath,
                                       NULL,
                                       WINHTTP_NO_REFERER,
-                                      acceptTypes,
+                                      /* MS API wrong decl, this is RO input */
+                                      (LPCWSTR *)acceptTypes,
                                       urlComp.nScheme == INTERNET_SCHEME_HTTPS
                                                       ? WINHTTP_FLAG_SECURE
                                                       : 0);
+    }
+
+    HGF_ASYNC_CHECK;
+    if(hRequest)
+      dtor->hRequest = hRequest;
 
     /* If specified, disable certificate-related errors for https connections. */
     if (hRequest
@@ -2070,32 +2308,41 @@ XS(w32_HttpGetFile)
      * configuration, which the request handle will inherit from the session).
      */
     if (hRequest && !bAborted) {
-        WINHTTP_AUTOPROXY_OPTIONS  AutoProxyOptions;
-        WINHTTP_PROXY_INFO         ProxyInfo;
-        DWORD                      cbProxyInfoSize = sizeof(ProxyInfo);
+        HGF_PXYINFO_T pi;
 
-        ZeroMemory(&AutoProxyOptions, sizeof(AutoProxyOptions));
-        ZeroMemory(&ProxyInfo, sizeof(ProxyInfo));
-        AutoProxyOptions.dwFlags = WINHTTP_AUTOPROXY_AUTO_DETECT;
-        AutoProxyOptions.dwAutoDetectFlags =
+        ZeroMemory(&pi, sizeof(pi)); /* null fill 2 structs, 1 func call */
+        pi.AutoProxyOptions.dwFlags = WINHTTP_AUTOPROXY_AUTO_DETECT;
+        pi.AutoProxyOptions.dwAutoDetectFlags =
                                     WINHTTP_AUTO_DETECT_TYPE_DHCP |
                                     WINHTTP_AUTO_DETECT_TYPE_DNS_A;
-        AutoProxyOptions.fAutoLogonIfChallenged = TRUE;
+        pi.AutoProxyOptions.fAutoLogonIfChallenged = TRUE;
 
         if(pfnWinHttpGetProxyForUrl(hSession,
                                 url,
-                                &AutoProxyOptions,
-                                &ProxyInfo)) {
+                                &pi.AutoProxyOptions,
+                                &pi.ProxyInfo)) {
+            LPWSTR wProxyStr;
             if(!pfnWinHttpSetOption(hRequest,
                                 WINHTTP_OPTION_PROXY,
-                                &ProxyInfo,
-                                cbProxyInfoSize)) {
+                                &pi.ProxyInfo,
+                                sizeof(pi.ProxyInfo))) {
                 bAborted = TRUE;
                 Perl_warn(aTHX_ "Win32::HttpGetFile: setting proxy options failed");
             }
-            Safefree(ProxyInfo.lpszProxy);
-            Safefree(ProxyInfo.lpszProxyBypass);
+/* bug fixed, perl's Safefree() is not GlobalFree(), different mem pools,
+   different malloc-type headers before "your pointer" */
+            wProxyStr = pi.ProxyInfo.lpszProxy;
+            if(wProxyStr) {
+                pi.ProxyInfo.lpszProxy = NULL;
+                GlobalFree(wProxyStr);
+            }
+            wProxyStr = pi.ProxyInfo.lpszProxyBypass;
+            if(wProxyStr) {
+                pi.ProxyInfo.lpszProxyBypass = NULL;
+                GlobalFree(wProxyStr);
+            }
         }
+        HGF_ASYNC_CHECK;
     }
 
     /* Send a request. */
@@ -2108,10 +2355,12 @@ XS(w32_HttpGetFile)
                                       0,
                                       0);
 
+    HGF_ASYNC_CHECK;
     /* End the request. */
     if (bResults)
         bResults = pfnWinHttpReceiveResponse(hRequest, NULL);
 
+    HGF_ASYNC_CHECK;
     /* Retrieve HTTP status code. */
     if (bResults) {
         dwQuerySize = sizeof(dwHttpStatusCode);
@@ -2125,14 +2374,18 @@ XS(w32_HttpGetFile)
 
     /* Retrieve HTTP status text. Note this may be a success message. */
     if (bResults) {
-        dwQuerySize = ONE_K_BUFSIZE * 2 - 2;
-        ZeroMemory(&msgbuf, ONE_K_BUFSIZE * 2);
+        dwQuerySize = (ONE_K_BUFSIZE * sizeof(WCHAR)) - sizeof(WCHAR);
         bResults = pfnWinHttpQueryHeaders(hRequest,
                                        WINHTTP_QUERY_STATUS_TEXT,
                                        WINHTTP_HEADER_NAME_BY_INDEX,
                                        msgbuf,
                                        &dwQuerySize,
                                        WINHTTP_NO_HEADER_INDEX);
+        if(bResults) {
+            msgbuf[dwQuerySize/sizeof(WCHAR)] = '\0';
+        } else {
+            msgbuf[0] = '\0';
+        }
     }
 
     /* There is no point in successfully downloading an error page from
@@ -2145,6 +2398,7 @@ XS(w32_HttpGetFile)
         }
     }
 
+    HGF_ASYNC_CHECK;
     /* Create output file for download. */
     if (bResults) {
         hOut = CreateFileW(file,
@@ -2155,20 +2409,24 @@ XS(w32_HttpGetFile)
                            FILE_ATTRIBUTE_NORMAL,
                            NULL);
 
-        if (hOut == INVALID_HANDLE_VALUE)
+        if (hOut == INVALID_HANDLE_VALUE) {
             bFileError = TRUE;
+        }
+        else {
+          dtor->hOut = hOut;
+        }
     }
 
     if (!bFileError && bResults) {
         DWORD dwDownloaded = 0;
         DWORD dwBytesWritten = 0;
-        DWORD dwSize = 65536;
-        char *pszOutBuffer;
-
-        New(0, pszOutBuffer, dwSize, char);
+        char OutBuffer [0xFFFF];
+        DWORD dwSize = sizeof(OutBuffer);
+        char * pszOutBuffer = (char *)OutBuffer;
 
         /* Keep checking for data until there is nothing left. */
         while (1) {
+            HGF_ASYNC_CHECK;
             if (!pfnWinHttpReadData(hRequest,
                                  (LPVOID)pszOutBuffer,
                                  dwSize,
@@ -2192,7 +2450,6 @@ XS(w32_HttpGetFile)
 
         }
 
-        Safefree(pszOutBuffer);
     }
     else {
         bAborted = TRUE;
@@ -2205,19 +2462,32 @@ XS(w32_HttpGetFile)
     /* If we successfully opened the output file but failed later, mark
      * the file for deletion.
      */
-    if (bAborted && hOut != INVALID_HANDLE_VALUE)
+    if (bAborted && hOut != INVALID_HANDLE_VALUE) {
+        HANDLE h = hOut;
+        hOut = INVALID_HANDLE_VALUE;
+        dtor->hOut = INVALID_HANDLE_VALUE;
+        CloseHandle(h);
         (void) DeleteFileW(file);
+    }
 
     /* Close any open handles. */
-    if (hOut != INVALID_HANDLE_VALUE) CloseHandle(hOut);
+    /* Do ASAP to flush disk file handle, and release all file locks.
+       FILE_SHARE_READ | FILE_SHARE_WRITE, are file locks themselves and
+       can block a future CreateFile/open().  When the SV mortal MG dtor
+       actually runs is questionable.  It WILL run, but when vs open() ?*/
+    if (hOut != INVALID_HANDLE_VALUE) {
+      HANDLE h = hOut;
+      hOut = INVALID_HANDLE_VALUE;
+      dtor->hOut = INVALID_HANDLE_VALUE;
+      CloseHandle(h);
+    }
+
+    /* Just let the SV MG dtor do it
     if (hRequest) pfnWinHttpCloseHandle(hRequest);
     if (hConnect) pfnWinHttpCloseHandle(hConnect);
     if (hSession) pfnWinHttpCloseHandle(hSession);
-
-    Safefree(url);
-    Safefree(file);
-    Safefree(hostName);
-    Safefree(urlPath);
+    if (file) Safefree(file);
+    */
 
     /* Retrieve system and WinHttp error messages, or compose a user-defined
      * error code if we got a failed HTTP status text above.  Conveniently, adding
@@ -2229,39 +2499,55 @@ XS(w32_HttpGetFile)
             SetLastError(dwHttpStatusCode + 1000000000);
         }
         else {
+            DWORD msg_len;
+            dMY_CXT;
             DWORD msgFlags = bFileError
                             ? FORMAT_MESSAGE_FROM_SYSTEM
                             : FORMAT_MESSAGE_FROM_HMODULE;
             msgFlags |= FORMAT_MESSAGE_IGNORE_INSERTS;
-
-            ZeroMemory(&msgbuf, ONE_K_BUFSIZE * 2);
-            if (!FormatMessageW(msgFlags,
-                                GetModuleHandleW(L"winhttp.dll"),
+/* "The WinHTTP Web Proxy Auto-Discovery Service detected a non- local RPC
+request (Transport Type = %1); Access Denied. There may have been an rogue
+attempt to gain access to the service through the network." at ~204 chars
+is probably the longest, but i8ln. */
+            msg_len = FormatMessageW(msgFlags,
+                                MY_CXT.winhttp, /* HMODULE */
                                 error,
                                 0,
                                 msgbuf,
                                 ONE_K_BUFSIZE - 1, /* TCHARs, not bytes */
-                                NULL)) {
-                wcsncpy(msgbuf, L"unable to format error message", ONE_K_BUFSIZE - 1);
+                                NULL);
+            if(msg_len) {
+                msgbuf[msg_len] = '\0'; /* paranoia */
+            }
+            else {
+                DWORD msg_len = sizeof(L"unable to format error message");
+                if(msg_len > sizeof(msgbuf)-1) /* assert will optimize out */
+                    croak_sub_glr(cv, "msgbuf", ERROR_BUFFER_OVERFLOW);
+                Move(L"unable to format error message", msgbuf, msg_len/2, WCHAR);
             }
             SetLastError(error);
         }
     }
 
-    if (GIMME_V == G_SCALAR) {
-        EXTEND(SP, 1);
-        ST(0) = !bAborted ? &PL_sv_yes : &PL_sv_no;
-        XSRETURN(1);
+    gimme_v = GIMME_V;
+    SPAGAIN; /* paranoia */
+    if(gimme_v != G_VOID) {
+        /* no EXTEND, 2 arg min check above */
+        SV * sv = !bAborted ? &PL_sv_yes : &PL_sv_no;
+        PUSHs(sv);
+        if (gimme_v == G_ARRAY) {
+            if(msgbuf[0]) {
+                error = GetLastError();
+                sv = wstr_to_sv(aTHX_ msgbuf, 0);
+                SetLastError(error);
+            }
+            else
+                sv = &PL_sv_no;
+            PUSHs(sv);
+        }
     }
-    else if (GIMME_V == G_ARRAY) {
-        EXTEND(SP, 2);
-        ST(0) = !bAborted ? &PL_sv_yes : &PL_sv_no;
-        ST(1) = wstr_to_sv(aTHX_ msgbuf);
-        XSRETURN(2);
-    }
-    else {
-        XSRETURN_EMPTY;
-    }
+    PUTBACK;
+    return;
 }
 
 #endif
