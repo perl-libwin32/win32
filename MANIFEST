@@ -6,6 +6,7 @@ README
 Win32.pm
 Win32.xs
 longpath.inc
+w32ppport.h
 t/CodePage.t
 t/CreateFile.t
 t/ExpandEnvironmentStrings.t

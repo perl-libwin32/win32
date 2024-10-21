@@ -5,16 +5,26 @@
 #include <windows.h>
 #include <shlobj.h>
 #include <wchar.h>
-#include <userenv.h>
+
+#if !defined(_MSC_VER) || (defined(_MSC_VER) && _MSC_VER >= 1300)
+#  include <userenv.h>
+#else
+#  define USERENV_API_DLL 1
+#endif
+
 #include <lm.h>
-#if !defined(__GNUC__) || (((100000 * __GNUC__) + (1000 * __GNUC_MINOR__)) >= 408000)
+
+#if (defined(_MSC_VER) && _MSC_VER >= 1400) || (((100000 * __GNUC__) + (1000 * __GNUC_MINOR__)) >= 408000)
 #  include <winhttp.h>
+#else
+#  define WINHTTP_API_DLL 1
 #endif
 
 #define PERL_NO_GET_CONTEXT
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
+#include "w32ppport.h"
 
 #ifndef countof
 #  define countof(array) (sizeof (array) / sizeof (*(array)))
@@ -57,17 +67,238 @@
 #  define WC_NO_BEST_FIT_CHARS 0x00000400
 #endif
 
-#ifdef WINHTTPAPI
+
+#define croak_sub(_cv, _pv) S_croak_sub((_cv), (_pv))
+STATIC void S_croak_sub(const CV *const cv, const char *const params);
+
+#define dll_ref_inc(_cv, _hm) S_dll_ref_inc((_cv),(_hm))
+static void S_dll_ref_inc(CV * cv, HMODULE hmod) {
+    HANDLE h;
+    WCHAR buf [MAX_PATH*2]; /* times 2 why not? 32KB paths one day lol*/
+    DWORD r = GetModuleFileNameW(hmod, (WCHAR *)buf, (sizeof(buf)/sizeof(WCHAR))-1);
+    if(!r)
+      croak_sub(cv, "dll_ref_inc");
+    h = LoadLibraryW((WCHAR *)buf);
+    if(!h)
+      croak_sub(cv, "dll_ref_inc");
+}
+
+#define dll_ref_dec(_cv, _hm) S_dll_ref_dec((_cv),(_hm))
+static void S_dll_ref_dec(CV * cv, HMODULE * hmod) {
+    HMODULE h = *hmod;
+    if(h) {
+        *hmod = NULL;
+        if(!FreeLibrary(h))
+            croak_sub(cv, "dll_ref_dec");
+    }
+}
 
 #define MY_CXT_KEY "Win32::Win32pm_guts"
+
 typedef struct {
+    WCHAR * s32dir;
+#ifdef WINHTTPAPI
     HMODULE winhttp;
+#endif
+#ifdef USERENV_API_DLL
+    HMODULE userenv;
+    PFNDestroyEnvironmentBlock pfnDestroyEnvironmentBlock;
+    PFNCreateEnvironmentBlock pfnCreateEnvironmentBlock;
+#endif
+#ifdef SHFOLDER_API_DLL
+    HMODULE shfolder; /* Win2k probably and up, shell32.dll will be here */
+    PFNSHGetFolderPathW pfnSHGetFolderPathW;
+#endif
+#ifdef SHELL32_API_DLL
+    HMODULE shell32;
+    PFNSHGetSpecialFolderPathW pfnSHGetSpecialFolderPathW;
+#endif
+#ifdef USER32_API_DLL
+    HMODULE user32;
+    PFNMessageBoxW pfnMessageBoxW;
+    PFNGetSystemMetrics pfnGetSystemMetrics;
+    PFNGetActiveWindow pfnGetActiveWindow;
+#endif
+#ifdef NETAPI32_API_DLL
+    HMODULE netapi32;
+    PFNNetWkstaGetInfo pfnNetWkstaGetInfo;
+    PFNNetApiBufferFree pfnNetApiBufferFree;
+#endif
+#ifdef VERSION_API_DLL
+    HMODULE version;
+    PFNGetFileVersionInfoA pfnGetFileVersionInfoA;
+    PFNGetFileVersionInfoSizeA pfnGetFileVersionInfoSizeA;
+    PFNVerQueryValueA pfnVerQueryValueA;
+#endif
+#ifdef OLE32_API_DLL
+    HMODULE ole32;
+    PFNCoCreateGuid pfnCoCreateGuid;
+    PFNCoTaskMemFree pfnCoTaskMemFree;
+    PFNStringFromCLSID pfnStringFromCLSID;
+#endif
+    USHORT s32dirlen;
 } my_cxt_t;
 
-START_MY_CXT
+START_MY_CXT;
 
+typedef struct {
+    WCHAR * s32dir;
+#ifdef WINHTTPAPI
+    WCHAR *winhttp;
+#endif
+#ifdef USERENV_API_DLL
+    WCHAR *userenv;
+    char * pfnDestroyEnvironmentBlock;
+    char * pfnCreateEnvironmentBlock;
+#endif
+#ifdef SHFOLDER_API_DLL
+    WCHAR *shfolder; /* Win2k probably and up, shell32.dll will be here */
+    char * pfnSHGetFolderPathW;
+#endif
+#ifdef SHELL32_API_DLL
+    WCHAR *shell32;
+    char * pfnSHGetSpecialFolderPathW;
+#endif
+#ifdef USER32_API_DLL
+    WCHAR *user32;
+    char * pfnMessageBoxW;
+    char * pfnGetSystemMetrics;
+    char * pfnGetActiveWindow;
+#endif
+#ifdef NETAPI32_API_DLL
+    WCHAR *netapi32;
+    char * pfnNetWkstaGetInfo;
+    char * pfnNetApiBufferFree;
+#endif
+#ifdef VERSION_API_DLL
+    WCHAR *version;
+    char * pfnGetFileVersionInfoA;
+    char * pfnGetFileVersionInfoSizeA;
+    char * pfnVerQueryValueA;
+#endif
+#ifdef OLE32_API_DLL
+    WCHAR *ole32;
+    char * pfnCoCreateGuid;
+    char * pfnCoTaskMemFree;
+    char * pfnStringFromCLSID;
+#endif
+    USHORT s32dirlen;
+} fntable_t;
+
+static const fntable_t fntable = {
+    L"",
+#ifdef WINHTTPAPI
+    L"winhttp",
+#endif
+#ifdef USERENV_API_DLL
+    L"userenv",
+    "DestroyEnvironmentBlock",
+    "CreateEnvironmentBlock",
+#endif
+#ifdef SHFOLDER_API_DLL
+    L"shfolder", /* Win2k probably and up, shell32.dll will be here */
+    "SHGetFolderPathW",
+#endif
+#ifdef SHELL32_API_DLL
+    L"shell32",
+    "SHGetSpecialFolderPathW",
+#endif
+#ifdef USER32_API_DLL
+    L"user32",
+    "MessageBoxW",
+    "GetSystemMetrics",
+    "GetActiveWindow",
+#endif
+#ifdef NETAPI32_API_DLL
+    L"netapi32",
+    "NetWkstaGetInfo",
+    "NetApiBufferFree",
+#endif
+#ifdef VERSION_API_DLL
+    L"version",
+    "GetFileVersionInfoA",
+    "GetFileVersionInfoSizeA",
+    "VerQueryValueA",
+#endif
+#ifdef OLE32_API_DLL
+    L"ole32",
+    "CoCreateGuid",
+    "CoTaskMemFree",
+    "StringFromCLSID",
+#endif
+    0
+};
+
+#define CALLFN(_fn) (MY_CXT.pfn##_fn \
+                    ? MY_CXT.pfn##_fn \
+                    : (PFN##_fn)(get_fn(aTHX_ cv, ((void **)(&MY_CXT.pfn##_fn)))))
+
+static void * get_fn(pTHX_ CV * cv, void ** p_to_pfn) {
+  dMY_CXT;
+  void * fn;
+  DWORD idxfn = ((char**)p_to_pfn)-((char**)&MY_CXT);
+  char ** fnname = ((char **)&fntable)+idxfn;
+  char ** widedll = ((char **)&fntable)+idxfn;
+  while(widedll != (char **)&fntable) {
+      if(!(*widedll)[1]) {/* if 2nd byte this is a wide DLL name */
+          DWORD idxhmod = ((char**)widedll)-((char **)&fntable);
+          HMODULE h = ((HMODULE *)&MY_CXT)[idxhmod];
+          if(!h) {
+              WCHAR * trydll = (WCHAR *)*widedll;
+              /* Ancient redundant stub >= 2K, search the probably
+                 already in address space shell32 first. */
+              if(trydll == L"shfolder") {
+                  trydll = L"shell32";
+                  h = LoadLibraryW((WCHAR *)*widedll);
+                  if(!h)
+                      croak_sub(cv, "LoadLibraryW");
+                  fn = (void *)GetProcAddress(h,*fnname);
+                  if(!fn) {
+                      FreeLibrary(h);
+                      h = LoadLibraryW(L"shfolder");
+                      if(!h)
+                          croak_sub(cv, "LoadLibraryW");
+                      else
+                          ((HMODULE *)&MY_CXT)[idxhmod] = h;
+                      fn = (void *)GetProcAddress(h,*fnname);
+                      if(!fn)
+                          croak_sub(cv, "GetProcAddress");
+                      else {
+                          *p_to_pfn = fn;
+                          return fn;
+                      }
+                  }
+                  else {
+                      ((HMODULE *)&MY_CXT)[idxhmod] = h;
+                      *p_to_pfn = fn;
+                      return fn;
+                  }
+              }
+              else {
+                  h = LoadLibraryW((WCHAR *)*widedll);
+                  if(!h)
+                      croak_sub(cv, "LoadLibraryW");
+                  else
+                      ((HMODULE *)&MY_CXT)[idxhmod] = h;
+              }
+          }
+          fn = (void *)GetProcAddress(h,*fnname);
+          if(!fn)
+              croak_sub(cv, "GetProcAddress");
+          else {
+              *p_to_pfn = fn;
+              return fn;
+          }
+      }
+      else
+        widedll--;
+  }
+  croak_sub(cv, "fntable");
+  return NULL;
+}
+
+#ifdef WINHTTPAPI
 XS(w32_HttpGetFile);
-
 #endif
 
 #define GETPROC(fn) pfn##fn = (PFN##fn)GetProcAddress(module, #fn)
@@ -94,93 +325,6 @@ typedef LONG (WINAPI *PFNRegGetValueA)(HKEY, LPCSTR, LPCSTR, DWORD, LPDWORD, PVO
     hgf_async_check(aTHX); \
 }
 
-typedef BOOL (__stdcall * PFNWinHttpCrackUrl) (
-LPCWSTR pwszUrl,
-DWORD dwUrlLength,
-DWORD dwFlags,
-LPURL_COMPONENTS lpUrlComponents
-);
-
-typedef HINTERNET (__stdcall * PFNWinHttpOpen) (
-LPCWSTR pszAgentW,
-DWORD dwAccessType,
-LPCWSTR pszProxyW,
-LPCWSTR pszProxyBypassW,
-DWORD dwFlags
-);
-
-typedef BOOL (__stdcall * PFNWinHttpCloseHandle) (
-HINTERNET hInternet
-);
-
-typedef HINTERNET (__stdcall * PFNWinHttpConnect) (
-HINTERNET hSession,
-LPCWSTR pswzServerName,
-INTERNET_PORT nServerPort,
-DWORD dwReserved
-);
-
-typedef BOOL (__stdcall * PFNWinHttpReadData) (
-HINTERNET hRequest,
-LPVOID lpBuffer,
-DWORD dwNumberOfBytesToRead,
-LPDWORD lpdwNumberOfBytesRead
-);
-
-typedef BOOL (__stdcall * PFNWinHttpSetOption) (
-HINTERNET hInternet,
-DWORD dwOption,
-LPVOID lpBuffer,
-DWORD dwBufferLength
-);
-
-typedef HINTERNET (__stdcall * PFNWinHttpOpenRequest) (
-HINTERNET hConnect,
-LPCWSTR pwszVerb,
-LPCWSTR pwszObjectName,
-LPCWSTR pwszVersion,
-LPCWSTR pwszReferrer OPTIONAL,
-LPCWSTR FAR * ppwszAcceptTypes,
-DWORD dwFlags
-);
-
-typedef BOOL (__stdcall * PFNWinHttpAddRequestHeaders) (
-HINTERNET hRequest,
-LPCWSTR lpszHeaders,
-DWORD dwHeadersLength,
-DWORD dwModifiers
-);
-
-typedef BOOL (__stdcall * PFNWinHttpSendRequest) (
-HINTERNET hRequest,
-LPCWSTR lpszHeaders,
-DWORD dwHeadersLength,
-LPVOID lpOptional,
-DWORD dwOptionalLength,
-DWORD dwTotalLength,
-DWORD_PTR dwContext
-);
-
-typedef BOOL (__stdcall * PFNWinHttpReceiveResponse) (
-HINTERNET hRequest,
-LPVOID lpReserved
-);
-
-typedef BOOL (__stdcall * PFNWinHttpQueryHeaders) (
- HINTERNET hRequest,
- DWORD dwInfoLevel,
- LPCWSTR   pwszName,
- LPVOID lpBuffer,
- LPDWORD   lpdwBufferLength,
- LPDWORD   lpdwIndex
-);
-
-typedef BOOL (__stdcall * PFNWinHttpGetProxyForUrl) (
-    HINTERNET                   hSession,
-    LPCWSTR                     lpcwszUrl,
-    WINHTTP_AUTOPROXY_OPTIONS * pAutoProxyOptions,
-    WINHTTP_PROXY_INFO *        pProxyInfo
-);
 
 volatile LONG WinHttpRefCnt = 0;
 volatile LONG WinHttpLoaded = 0;
@@ -198,6 +342,8 @@ PFNWinHttpQueryHeaders pfnWinHttpQueryHeaders = NULL;
 PFNWinHttpGetProxyForUrl pfnWinHttpGetProxyForUrl = NULL;
 
 typedef struct {
+    /* first 4 fields are NULL inited, so they are in a row for
+       SSE/AVX memset() instrinsic friendly */
     HINTERNET hSession;
     HINTERNET hConnect;
     HINTERNET hRequest;
@@ -250,6 +396,7 @@ static int hgf_free(pTHX_ SV* sv, MAGIC* mg) {
 static int hgf_dup(pTHX_ MAGIC *mg, CLONE_PARAMS *param) {
     /* nothing can survive a ithread/psuedofork, no WinHttpDuplicateHandle() */
     HGF_DTOR_T * dtor = (HGF_DTOR_T *)mg->mg_ptr;
+    /*4 NULLs in a row, SSE/AVX memset() instrinsic friendly */
     dtor->hRequest = NULL;
     dtor->hConnect = NULL;
     dtor->hSession = NULL;
@@ -378,8 +525,8 @@ struct g_osver_t {
 } g_osver = {0, 0, 0, 0, 0, "", 0, 0, 0, 0, 0};
 BOOL g_osver_ex = TRUE;
 
-/* Croak with XSUB's name prefixed, taken from croak_xs_usage */
-#define croak_sub(_cv, _pv) S_croak_sub((_cv), (_pv))
+/* Croak with XSUB's name prefixed, and any suffix string, taken from
+   croak_xs_usage */
 STATIC void
 S_croak_sub(const CV *const cv, const char *const params)
 {
@@ -443,6 +590,8 @@ sv_to_wstr_len(pTHX_ const CV *const cv, SV *sv, STRLEN *plen)
             wlen = MultiByteToWideChar(cp, 0, str, (int)(len+1), NULL, 0);
             if(wlen == 0) /* probably illegal code point in some code page */
                 goto croak;
+            /* null or paranoia, are inputs from supposed to have a
+               narrow nul byte that comes out as output*/
             wlen++;
             Renew(wstr, wlen, WCHAR);
             wlen = MultiByteToWideChar(cp, 0, str, (int)(len+1), wstr, wlen);
@@ -464,6 +613,7 @@ sv_to_wstr_len(pTHX_ const CV *const cv, SV *sv, STRLEN *plen)
     croak_err:
     Safefree(wstr);
     croak_sub_glr(cv, "MultiByteToWideChar", e);
+    return NULL;
 }
 
 static WCHAR*
@@ -477,7 +627,7 @@ sv_to_wstr(pTHX_ const CV *const cv, SV *sv) {
  * Arg len is in units of WCHAR not including WIDE null, just like MS APIs.
  * Arg len IS NOT in units of bytes. If len is 0, wcslen() is called instead.
  */
-SV *
+static SV *
 wstr_to_sv(pTHX_ WCHAR *wstr, STRLEN len)
 {
     /* 2 GB-1 max, do len = 0 on overflow instead of croak for now, too rare */
@@ -513,9 +663,12 @@ wstr_to_sv(pTHX_ WCHAR *wstr, STRLEN len)
  * overwrites it with the ANSI version, which contains replacement
  * characters for the characters not in the ANSI codepage.
  */
-SV*
-get_unicode_env(pTHX_ const WCHAR *name)
+static SV*
+get_unicode_env(pTHX_ CV* cv, const WCHAR *name)
 {
+#ifdef USERENV_API_DLL
+    dMY_CXT;
+#endif
     SV *sv = NULL;
     void *env;
     HANDLE token;
@@ -527,7 +680,12 @@ get_unicode_env(pTHX_ const WCHAR *name)
     }
 
     /* Create a Unicode environment block for this process */
+
+#ifdef USERENV_API_DLL
+    if (CALLFN(CreateEnvironmentBlock)(&env, token, FALSE))
+#else
     if (CreateEnvironmentBlock(&env, token, FALSE))
+#endif
     {
         size_t name_len = wcslen(name);
         WCHAR *entry = (WCHAR *)env;
@@ -545,7 +703,11 @@ get_unicode_env(pTHX_ const WCHAR *name)
             }
             entry += entry_len+1;
         }
+#ifdef USERENV_API_DLL
+        CALLFN(DestroyEnvironmentBlock)(env);
+#else
         DestroyEnvironmentBlock(env);
+#endif
     }
     CloseHandle(token);
     return sv;
@@ -620,7 +782,7 @@ wstr_to_ansipath(pTHX_ WCHAR *wstr)
     return sv;
 }
 
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__) || !(PERL_VERSION >= 8 || (PERL_VERSION == 7 && PERL_SUBVERSION >= 3))
 
 char*
 get_childdir(void)
@@ -651,7 +813,9 @@ free_childenv(void *d)
   PERL_UNUSED_ARG(d);
 }
 
+#ifdef __CYGWIN__
 #  define PerlDir_mapA(dir) (dir)
+#endif
 
 #endif
 
@@ -850,9 +1014,9 @@ XS(w32_InitiateSystemShutdown)
                                    (BOOL)SvIV(ST(3)), (BOOL)SvIV(ST(4)));
 
     /* Disable shutdown privilege. */
-    tkp.Privileges[0].Attributes = 0; 
+    tkp.Privileges[0].Attributes = 0;
     AdjustTokenPrivileges(hToken, FALSE, &tkp, 0,
-			  (PTOKEN_PRIVILEGES)NULL, 0); 
+			  (PTOKEN_PRIVILEGES)NULL, 0);
     CloseHandle(hToken);
     XSRETURN_IV(bRet);
 }
@@ -1056,20 +1220,34 @@ XS(w32_GuidGen)
     GUID guid;
     char szGUID[50] = {'\0'};
     HRESULT  hr;
+#ifdef OLE32_API_DLL
+    dMY_CXT;
+#endif
     if (items)
-	Perl_croak(aTHX_ "usage: Win32::GuidGen()");
-
+       Perl_croak(aTHX_ "usage: Win32::GuidGen()");
+#ifdef OLE32_API_DLL
+    hr     = CALLFN(CoCreateGuid)(&guid);
+#else
     hr     = CoCreateGuid(&guid);
+#endif
     if (SUCCEEDED(hr)) {
 	LPOLESTR pStr = NULL;
+#ifdef OLE32_API_DLL
+	if (SUCCEEDED(CALLFN(StringFromCLSID)(&guid, &pStr))) {
+#else
 #ifdef __cplusplus
 	if (SUCCEEDED(StringFromCLSID(guid, &pStr))) {
 #else
 	if (SUCCEEDED(StringFromCLSID(&guid, &pStr))) {
 #endif
+#endif
             WideCharToMultiByte(CP_ACP, 0, pStr, (int)wcslen(pStr), szGUID,
                                 sizeof(szGUID), NULL, NULL);
+#ifdef OLE32_API_DLL
+            CALLFN(CoTaskMemFree)(pStr);
+#else
             CoTaskMemFree(pStr);
+#endif
             XSRETURN_PV(szGUID);
         }
     }
@@ -1078,6 +1256,9 @@ XS(w32_GuidGen)
 
 XS(w32_GetFolderPath)
 {
+#if defined(SHFOLDER_API_DLL) || defined (SHELL32_API_DLL)
+    dMY_CXT;
+#endif
     dXSARGS;
     WCHAR wpath[MAX_PATH+1];
     int folder;
@@ -1089,13 +1270,20 @@ XS(w32_GetFolderPath)
     folder = (int)SvIV(ST(0));
     if (items == 2)
         create = SvTRUE(ST(1)) ? CSIDL_FLAG_CREATE : 0;
-
+#ifdef SHFOLDER_API_DLL
+    if (SUCCEEDED(CALLFN(SHGetFolderPathW)(NULL, folder|create, NULL, 0, wpath))) {
+#else
     if (SUCCEEDED(SHGetFolderPathW(NULL, folder|create, NULL, 0, wpath))) {
+#endif
         ST(0) = wstr_to_ansipath(aTHX_ wpath);
         XSRETURN(1);
     }
 
+#ifdef SHELL32_API_DLL
+    if (CALLFN(SHGetSpecialFolderPathW)(NULL, wpath, folder, !!create)) {
+#else
     if (SHGetSpecialFolderPathW(NULL, wpath, folder, !!create)) {
+#endif
         ST(0) = wstr_to_ansipath(aTHX_ wpath);
         XSRETURN(1);
     }
@@ -1185,11 +1373,11 @@ XS(w32_GetFolderPath)
          */
         sv = NULL;
         switch (folder) {
-        case CSIDL_APPDATA:              sv = get_unicode_env(aTHX_ L"APPDATA");            break;
-        case CSIDL_PROFILE:              sv = get_unicode_env(aTHX_ L"USERPROFILE");        break;
-        case CSIDL_PROGRAM_FILES:        sv = get_unicode_env(aTHX_ L"ProgramFiles");       break;
-        case CSIDL_PROGRAM_FILES_COMMON: sv = get_unicode_env(aTHX_ L"CommonProgramFiles"); break;
-        case CSIDL_WINDOWS:              sv = get_unicode_env(aTHX_ L"SystemRoot");         break;
+        case CSIDL_APPDATA:              sv = get_unicode_env(aTHX_ cv, L"APPDATA");            break;
+        case CSIDL_PROFILE:              sv = get_unicode_env(aTHX_ cv, L"USERPROFILE");        break;
+        case CSIDL_PROGRAM_FILES:        sv = get_unicode_env(aTHX_ cv, L"ProgramFiles");       break;
+        case CSIDL_PROGRAM_FILES_COMMON: sv = get_unicode_env(aTHX_ cv, L"CommonProgramFiles"); break;
+        case CSIDL_WINDOWS:              sv = get_unicode_env(aTHX_ cv, L"SystemRoot");         break;
         }
         if (sv) {
             ST(0) = sv;
@@ -1207,23 +1395,37 @@ XS(w32_GetFileVersion)
     DWORD handle;
     char *filename;
     char *data;
+#ifdef VERSION_API_DLL
+    dMY_CXT;
+#endif
 
     if (items != 1)
 	croak("usage: Win32::GetFileVersion($filename)");
 
     filename = SvPV_nolen(ST(0));
+#ifdef VERSION_API_DLL
+    size = CALLFN(GetFileVersionInfoSizeA)(filename, &handle);
+#else
     size = GetFileVersionInfoSize(filename, &handle);
+#endif
     if (!size)
         XSRETURN_UNDEF;
 
     New(0, data, size, char);
     if (!data)
         XSRETURN_UNDEF;
-
+#ifdef VERSION_API_DLL
+    if (CALLFN(GetFileVersionInfoA)(filename, handle, size, data)) {
+#else
     if (GetFileVersionInfo(filename, handle, size, data)) {
+#endif
         VS_FIXEDFILEINFO *info;
         UINT len;
+#ifdef VERSION_API_DLL
+        if (CALLFN(VerQueryValueA)(data, "\\", (void**)&info, &len)) {
+#else
         if (VerQueryValue(data, "\\", (void**)&info, &len)) {
+#endif
             int dwValueMS1 = (info->dwFileVersionMS>>16);
             int dwValueMS2 = (info->dwFileVersionMS&0xffff);
             int dwValueLS1 = (info->dwFileVersionLS>>16);
@@ -2046,46 +2248,101 @@ XS(w32_IsDeveloperModeEnabled)
 XS(w32_CLONE)
 {
     dXSARGS;
-#ifdef WINHTTPAPI
     HMODULE h;
     WCHAR buf [MAX_PATH*2]; /* times 2 why not? 32KB paths one day lol*/
-
-    {
-        MY_CXT_CLONE; /* a redundant memcpy() on this line */
-        h = MY_CXT.winhttp;
-        if(h) { /* bump ref count on dll */
-            InterlockedIncrement(&WinHttpRefCnt);
-            if(!GetModuleFileNameW(h, (WCHAR *)buf, (sizeof(buf)/sizeof(WCHAR))-1)) {
-                DecRefWinHttp();
-                Perl_croak_nocontext("Win32.pm WinHttp DLL load failed %u", GetLastError());
-            }
-            h = LoadLibraryW((WCHAR *)buf);
-            MY_CXT.winhttp = h;
-            if(!h) {
-                DecRefWinHttp();
-                Perl_croak_nocontext("Win32.pm WinHttp DLL load failed %u", GetLastError());
-            }
+    WCHAR * wp;
+    WCHAR * wpnew;
+    DWORD len;
+    MY_CXT_CLONE; /* a redundant memcpy() on this line */
+    wp = MY_CXT.s32dir;
+    if(wp) {
+      len = MY_CXT.s32dirlen+1;
+      New(0, wpnew, len, WCHAR);
+      MY_CXT.s32dir = wpnew;
+      Move(wp, wpnew, len, WCHAR);
+    }
+#ifdef WINHTTPAPI
+    h = MY_CXT.winhttp;
+    if(h) { /* bump ref count on dll */
+        InterlockedIncrement(&WinHttpRefCnt);
+        if(!GetModuleFileNameW(h, (WCHAR *)buf, (sizeof(buf)/sizeof(WCHAR))-1)) {
+            DecRefWinHttp();
+            Perl_croak_nocontext("Win32.pm WinHttp DLL load failed %u", GetLastError());
+        }
+        h = LoadLibraryW((WCHAR *)buf);
+        MY_CXT.winhttp = h;
+        if(!h) {
+            DecRefWinHttp();
+            Perl_croak_nocontext("Win32.pm WinHttp DLL load failed %u", GetLastError());
         }
     }
+#endif
+#ifdef USERENV_API_DLL
+    dll_ref_inc(cv, MY_CXT.userenv);
+#endif
+#ifdef SHFOLDER_API_DLL
+    dll_ref_inc(cv, MY_CXT.shfolder);
+#endif
+#ifdef SHELL32_API_DLL
+    dll_ref_inc(cv, MY_CXT.shell32);
+#endif
+#ifdef USER32_API_DLL
+    dll_ref_inc(cv, MY_CXT.user32);
+#endif
+#ifdef NETAPI32_API_DLL
+    dll_ref_inc(cv, MY_CXT.netapi32);
+#endif
+#ifdef VERSION_API_DLL
+    dll_ref_inc(cv, MY_CXT.version);
+#endif
+#ifdef OLE32_API_DLL
+    dll_ref_inc(cv, MY_CXT.ole32);
 #endif
 }
 
 XS(w32_END)
 {
     dXSARGS;
-    SP = MARK;
-    PUTBACK;
-#ifdef WINHTTPAPI
     {
         dMY_CXT;
-        HMODULE h = MY_CXT.winhttp;
+        HMODULE h;
+        WCHAR * wp;
+        wp = MY_CXT.s32dir;
+        if(wp) {
+          MY_CXT.s32dir = NULL;
+          MY_CXT.s32dirlen = 0;
+          Safefree(wp);
+        }
+#ifdef WINHTTPAPI
+        h = MY_CXT.winhttp;
         if(h) {
             MY_CXT.winhttp = NULL;
             DecRefWinHttp();
             FreeLibrary(h);
         }
-    }
 #endif
+#ifdef USERENV_API_DLL
+    dll_ref_dec(cv, &MY_CXT.userenv);
+#endif
+#ifdef SHFOLDER_API_DLL
+    dll_ref_dec(cv, &MY_CXT.shfolder);
+#endif
+#ifdef SHELL32_API_DLL
+    dll_ref_dec(cv, &MY_CXT.shell32);
+#endif
+#ifdef USER32_API_DLL
+    dll_ref_dec(cv, &MY_CXT.user32);
+#endif
+#ifdef NETAPI32_API_DLL
+    dll_ref_dec(cv, &MY_CXT.netapi32);
+#endif
+#ifdef VERSION_API_DLL
+    dll_ref_dec(cv, &MY_CXT.version);
+#endif
+#ifdef OLE32_API_DLL
+    dll_ref_dec(cv, &MY_CXT.ole32);
+#endif
+    }
 }
 
 #ifdef WINHTTPAPI
@@ -2558,8 +2815,9 @@ PROTOTYPES: DISABLE
 
 BOOT:
 {
-    const char *file = __FILE__;
-
+    char *file = (char *)__FILE__; /* silence const warnings 5.6 */
+    if(sizeof(my_cxt_t) != sizeof(fntable_t)) /* assert optize away*/
+        croak_sub_glr(cv, "my_cxt_t fntable_t mismatch", ERROR_INSUFFICIENT_BUFFER);
     if (g_osver.dwOSVersionInfoSize == 0) {
         g_osver.dwOSVersionInfoSize = sizeof(g_osver);
         if (!GetVersionExA((OSVERSIONINFOA*)&g_osver)) {
@@ -2629,9 +2887,9 @@ BOOT:
 #endif
 #ifdef WINHTTPAPI
     newXS("Win32::HttpGetFile", w32_StubLoadWinHttp, file);
+#endif
     newXS("Win32::CLONE", w32_CLONE, file);
     newXS("Win32::END", w32_END, file);
     MY_CXT_INIT;
-#endif
     XSRETURN_YES;
 }
