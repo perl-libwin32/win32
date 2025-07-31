@@ -3,7 +3,7 @@ use Config qw(%Config);
 use Test::More;
 use Win32;
 
-my $fork_emulation = $Config{ccflags} =~ /PERL_IMPLICIT_SYS/;
+my $fork_emulation = defined($Config{useithreads});
 
 plan tests => $fork_emulation ? 4 : 2;
 
