@@ -1,0 +1,63 @@
+name: test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  strawberry:
+    name: Strawberry ${{ matrix.perl-version }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        perl-version: ["5.32", "5.36", "5.38", "5.40"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: ${{ matrix.perl-version }}
+          distribution: strawberry
+      - run: perl -V
+      - run: cpanm --installdeps --notest .
+      - run: cpanm --test-only --verbose .
+
+  cygwin:
+    name: Cygwin (${{ matrix.cc }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, g++]
+    defaults:
+      run:
+        shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
+    steps:
+      - name: Preserve LF line endings on checkout
+        shell: pwsh
+        run: git config --global core.autocrlf input
+      - uses: actions/checkout@v4
+      - uses: cygwin/cygwin-install-action@v6
+        with:
+          packages: >-
+            perl
+            perl-ExtUtils-MakeMaker
+            make
+            gcc-core
+            gcc-g++
+            libcrypt-devel
+            curl
+      - name: Build and test
+        run: |
+          cd "$(cygpath --unix "$GITHUB_WORKSPACE")"
+          perl -V
+          curl --fail --silent --location https://cpanmin.us --output /tmp/cpanm
+          perl /tmp/cpanm --notest App::cpanminus
+          cpanm --installdeps --notest .
+          if [ "${{ matrix.cc }}" = "g++" ]; then
+            cpanm --test-only --verbose --configure-args "CC=g++" .
+          else
+            cpanm --test-only --verbose .
+          fi
