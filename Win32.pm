@@ -631,6 +631,12 @@ sub _GetOSName {
                 elsif ($build == 26100) {
                     $desc = " Version 24H2 (2024 Update)";
                 }
+                elsif ($build == 26200) {
+                    $desc = " Version 25H2 (2025 Update)";
+                }
+                elsif ($build == 28000) {
+                    $desc = " Version 26H1 (2026 Update)";
+                }
                 else {
                     $desc = " Build $build";
                 }
