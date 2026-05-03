@@ -370,7 +370,7 @@ sub GetOSDisplayName {
 		$desc =~ s/^\s*//;
 		s/(200.)/$name Server $1/;
 	    }
-	    s/^Windows (20(03|08|12|16|19|22))/Windows Server $1/;
+	    s/^Windows (20(03|08|12|16|19|22|25))/Windows Server $1/;
             s/^Windows SAC/Windows Server/;
 	}
     }
@@ -647,6 +647,10 @@ sub _GetOSName {
                 elsif ($build == 20348) {
                     $os = "2022";
                     $desc = "Version 21H2";
+                }
+                elsif ($build == 26100) {
+                    $os = "2025";
+                    $desc = "Version 24H2";
                 }
                 else {
                     # (Semi) Annual Channel (AC)
@@ -1183,6 +1187,7 @@ Currently the possible values for the OS name are
     Win2016
     Win2019
     Win2022
+    Win2025
     Win11
     WinSAC
 
@@ -1240,6 +1245,7 @@ Currently known values for ID MAJOR MINOR and BUILD are as follows:
     Windows Server 2016      2     10       0   14393
     Windows Server 2019      2     10       0   17763
     Windows Server 2022      2     10       0   20348
+    Windows Server 2025      2     10       0   26100
     Windows 11               2     10       0       -
 
 On Windows NT 4 SP6 and later this function returns the following

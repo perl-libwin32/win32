@@ -150,6 +150,7 @@ my @win10_tests = (
 ["2016 [Version 1607]",                                    "2016",    2, 10, 0, 0x07, 2, 0, 14393],
 ["2019 [Version 1809]",                                    "2019",    2, 10, 0, 0x07, 2, 0, 17763],
 ["2022 [Version 21H2]",                                    "2022",    2, 10, 0, 0x07, 2, 0, 20348],
+["2025 [Version 24H2]",                                    "2025",    2, 10, 0, 0x07, 2, 0, 26100],
 
 ["Server [Version 1709]",                                  "Server",  2, 10, 0, 0x07, 2, 0, 16299],
 ["Server [Version 1803]",                                  "Server",  2, 10, 0, 0x07, 2, 0, 17134],
@@ -186,7 +187,7 @@ sub check {
     # and 2003/2008 start with "Windows Server"
     unless ($pretty eq "Win32s") {
 	my $prefix = "Windows";
-	$prefix .= " Server" if $pretty =~ /^20(03|08|12|16|19|22)/;
+	$prefix .= " Server" if $pretty =~ /^20(03|08|12|16|19|22|25)/;
 	$pretty = "$prefix $pretty";
     }
 
