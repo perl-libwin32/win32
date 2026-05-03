@@ -562,7 +562,10 @@ sub _GetOSName {
                 $os = $build < 22000 ? '10' : '11';
 
                 # Build numbers from https://en.wikipedia.org/wiki/Windows_10_version_history
-                # windows 10
+                # Windows 10. Versions 1507 through 1903 each cover a build
+                # range to label preview/insider builds; from 1909 onward
+                # Microsoft ships releases as enablement packages on the
+                # same kernel build, so each version maps to one build.
                 if (9841 <= $build && $build <= 10240) {
                     $desc = " Version 1507";
                     $desc .= " (Preview Build $build)" if $build < 10240;
@@ -615,7 +618,7 @@ sub _GetOSName {
                     $desc = " Version 22H2 (2022 Update)";
                 }
                 # Build numbers from https://en.wikipedia.org/wiki/Windows_11_version_history
-                # windows 11
+                # Windows 11
                 elsif ($build == 22000) {
                     $desc = " Version 21H2 (2021 Update)";
                 }
