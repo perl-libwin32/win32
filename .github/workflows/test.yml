@@ -15,8 +15,8 @@ jobs:
       matrix:
         perl-version: ["5.32", "5.36", "5.38", "5.40"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: shogo82148/actions-setup-perl@v1
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: shogo82148/actions-setup-perl@9f8c263975569ff3b4e510cb1f8813115749e146 # v1.41.0
         with:
           perl-version: ${{ matrix.perl-version }}
           distribution: strawberry
@@ -38,8 +38,8 @@ jobs:
       - name: Preserve LF line endings on checkout
         shell: pwsh
         run: git config --global core.autocrlf input
-      - uses: actions/checkout@v4
-      - uses: cygwin/cygwin-install-action@v6
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: cygwin/cygwin-install-action@711d29f3da23c9f4a1798e369a6f01198c13b11a # v6.1
         with:
           packages: >-
             perl
