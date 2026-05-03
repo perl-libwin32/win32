@@ -24,6 +24,25 @@ jobs:
       - run: cpanm --installdeps --notest .
       - run: cpanm --test-only --verbose .
 
+  strawberry-32bit:
+    name: Strawberry 5.38.2.1 (32-bit)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Install 32-bit Strawberry Perl
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/StrawberryPerl/Perl-Dist-Strawberry/releases/download/SP_5382_32bit/strawberry-perl-5.38.2.1-32bit-portable.zip'
+          $zip = "$env:RUNNER_TEMP\strawberry32.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath C:\strawberry32
+          Add-Content -Path $env:GITHUB_PATH -Value 'C:\strawberry32\perl\site\bin'
+          Add-Content -Path $env:GITHUB_PATH -Value 'C:\strawberry32\perl\bin'
+          Add-Content -Path $env:GITHUB_PATH -Value 'C:\strawberry32\c\bin'
+      - run: perl -V
+      - run: cpanm --installdeps --notest .
+      - run: cpanm --test-only --verbose .
+
   cygwin:
     name: Cygwin (${{ matrix.cc }})
     runs-on: windows-latest
