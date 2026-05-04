@@ -1,8 +1,9 @@
 Changes
+LICENSE
 MANIFEST
 META.yml
 Makefile.PL
-README
+README.md
 Win32.pm
 Win32.xs
 longpath.inc
