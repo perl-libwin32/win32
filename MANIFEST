@@ -18,6 +18,7 @@ t/GetOSName.t
 t/GetOSVersion.t
 t/GetShortPathName.t
 t/GuidGen.t
+t/HttpGetFile.t
 t/Names.t
 t/Privileges.t
 t/Unicode.t

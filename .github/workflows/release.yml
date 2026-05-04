@@ -1,0 +1,17 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: perl-libwin32/.github/release-action@v1
+        with:
+          version-file: Win32.pm
+          dist-name: Win32
