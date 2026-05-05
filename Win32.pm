@@ -1282,7 +1282,7 @@ for Windows 8.1 and Windows 10 starting from 5.24.0 (or more precisely
 from 5.23.3, if one takes development releases into account). Older
 releases of perl return the minor version as 2, while newer releases
 return it as 3. See Microsoft's L<Operating System
-Version|https://docs.microsoft.com/en-us/windows/win32/sysinfo/operating-system-version>
+Version|https://learn.microsoft.com/en-us/windows/win32/sysinfo/operating-system-version>
 documentation for more details.
 
 For modern Windows releases, the major and minor version numbers are
@@ -1619,7 +1619,7 @@ DllUnregisterServer.
 =head2 Short Path Names
 
 There are many situations in which modern Windows systems will not have
-the L<short path name|https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file#short-vs-long-names>
+the L<short path name|https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#short-vs-long-names>
 (also called 8.3 or MS-DOS) alias for long file names available.
 
 Short path support can be configured system-wide via the registry,
