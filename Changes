@@ -1,5 +1,9 @@
 Revision history for the Perl extension Win32.
 
+0.60    [2026-05-05]
+        - add LICENSE and modernize README [PR/51]
+        - update Microsoft doc URLs to learn.microsoft.com
+
 0.59_02 [2026-05-04]
         - detect newer Windows 10/11, Windows Server 2019/2022/2025, and
           Server SAC releases by Markus Demml [PR/42]

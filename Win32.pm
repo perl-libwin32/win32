@@ -8,7 +8,7 @@ package Win32;
     require DynaLoader;
 
     @ISA = qw|Exporter DynaLoader|;
-    $VERSION = '0.59_02';
+    $VERSION = '0.60';
     $XS_VERSION = $VERSION;
     $VERSION = eval $VERSION;
 
