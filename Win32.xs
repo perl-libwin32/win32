@@ -128,6 +128,29 @@ BOOL g_osver_ex = TRUE;
 
 #define ONE_K_BUFSIZE	1024
 
+/* Wrap ACP-encoded bytes in a new mortal SV. When the system codepage
+ * is CP_UTF8 ("Use Unicode UTF-8 for worldwide language support"), the
+ * bytes are valid UTF-8 — flag the SV so concatenation with Unicode
+ * strings doesn't double-encode.
+ */
+SV *
+acp_bytes_to_sv(pTHX_ const char *bytes, STRLEN len)
+{
+    SV *sv = sv_2mortal(newSVpvn(bytes, len));
+    if (GetACP() == CP_UTF8)
+        SvUTF8_on(sv);
+    return sv;
+}
+
+/* Set ACP-encoded bytes into an existing SV; flag UTF-8 on CP_UTF8 ACP. */
+void
+sv_setpv_acp(pTHX_ SV *sv, const char *bytes)
+{
+    sv_setpv(sv, bytes);
+    if (GetACP() == CP_UTF8)
+        SvUTF8_on(sv);
+}
+
 /* Convert SV to wide character string.  The return value must be
  * freed using Safefree().
  */
@@ -447,7 +470,7 @@ XS(w32_LookupAccountName)
                                  &DomLen,		/* Domain buffer size */
                                  &snu);			/* SID name type */
     if (bResult) {
-	sv_setpv(ST(2), Domain);
+	sv_setpv_acp(aTHX_ ST(2), Domain);
 	sv_setpvn(ST(3), SID, SIDLen);
 	sv_setiv(ST(4), snu);
 	XSRETURN_YES;
@@ -480,8 +503,8 @@ XS(w32_LookupAccountSID)
                                     &DomLen,		/* Domain buffer length */
                                     &snu);		/* SID name type */
 	if (bResult) {
-	    sv_setpv(ST(2), Account);
-	    sv_setpv(ST(3), Domain);
+	    sv_setpv_acp(aTHX_ ST(2), Account);
+	    sv_setpv_acp(aTHX_ ST(3), Domain);
 	    sv_setiv(ST(4), (IV)snu);
 	    XSRETURN_YES;
 	}
@@ -1060,7 +1083,7 @@ XS(w32_NodeName)
     EXTEND(SP,1);
     if (GetComputerName(name,&size)) {
 	/* size does NOT include NULL :-( */
-	ST(0) = sv_2mortal(newSVpvn(name,size));
+	ST(0) = acp_bytes_to_sv(aTHX_ name, size);
 	XSRETURN(1);
     }
     XSRETURN_UNDEF;
@@ -1070,8 +1093,6 @@ XS(w32_NodeName)
 XS(w32_DomainName)
 {
     dXSARGS;
-    char dname[256];
-    DWORD dnamelen = sizeof(dname);
     WKSTA_INFO_100 *pwi;
     DWORD retval;
 
@@ -1083,16 +1104,12 @@ XS(w32_DomainName)
     retval = NetWkstaGetInfo(NULL, 100, (LPBYTE*)&pwi);
     /* NERR_Success *is* 0*/
     if (retval == 0) {
-        if (pwi->wki100_langroup && *(pwi->wki100_langroup)) {
-            WideCharToMultiByte(CP_ACP, 0, pwi->wki100_langroup,
-                                -1, (LPSTR)dname, dnamelen, NULL, NULL);
-        }
-        else {
-            WideCharToMultiByte(CP_ACP, 0, pwi->wki100_computername,
-                                -1, (LPSTR)dname, dnamelen, NULL, NULL);
-        }
+        WCHAR *src = (pwi->wki100_langroup && *(pwi->wki100_langroup))
+                     ? pwi->wki100_langroup
+                     : pwi->wki100_computername;
+        ST(0) = wstr_to_sv(aTHX_ src);
         NetApiBufferFree(pwi);
-        XSRETURN_PV(dname);
+        XSRETURN(1);
     }
     SetLastError(retval);
     XSRETURN_UNDEF;
@@ -1108,14 +1125,15 @@ XS(w32_FsType)
     if (GetVolumeInformation(NULL, NULL, 0, NULL, &filecomplen,
                              &flags, fsname, sizeof(fsname))) {
 	if (GIMME_V == G_ARRAY) {
-	    XPUSHs(sv_2mortal(newSVpvn(fsname,strlen(fsname))));
+	    XPUSHs(acp_bytes_to_sv(aTHX_ fsname, strlen(fsname)));
 	    XPUSHs(sv_2mortal(newSViv(flags)));
 	    XPUSHs(sv_2mortal(newSViv(filecomplen)));
 	    PUTBACK;
 	    return;
 	}
 	EXTEND(SP,1);
-	XSRETURN_PV(fsname);
+	ST(0) = acp_bytes_to_sv(aTHX_ fsname, strlen(fsname));
+	XSRETURN(1);
     }
     XSRETURN_EMPTY;
 }
@@ -1175,7 +1193,8 @@ XS(w32_FormatMessage)
                        &source, (DWORD)SvIV(ST(0)), 0,
                        msgbuf, sizeof(msgbuf)-1, NULL))
     {
-        XSRETURN_PV(msgbuf);
+        ST(0) = acp_bytes_to_sv(aTHX_ msgbuf, strlen(msgbuf));
+        XSRETURN(1);
     }
 
     XSRETURN_UNDEF;
