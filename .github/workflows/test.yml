@@ -9,3 +9,46 @@ on:
 jobs:
   test:
     uses: perl-libwin32/.github/.github/workflows/test.yml@v1
+
+  utf8-acp:
+    name: UTF-8 ACP (Strawberry ${{ matrix.perl-version }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        perl-version: ['5.40']
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: shogo82148/actions-setup-perl@9f8c263975569ff3b4e510cb1f8813115749e146 # v1.41.0
+        with:
+          perl-version: ${{ matrix.perl-version }}
+          distribution: strawberry
+      # Embed the per-process UTF-8 ACP opt-in (Windows 10 1903+) into
+      # perl.exe so the rest of the job runs as if the system code page
+      # were CP_UTF8. External .manifest files are ignored when the exe
+      # already has an embedded manifest, so we rewrite it with mt.exe.
+      - name: Enable UTF-8 ACP for perl.exe
+        shell: pwsh
+        run: |
+          $perl = (Get-Command perl).Source
+          $manifest = @'
+          <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+            <application xmlns="urn:schemas-microsoft-com:asm.v3">
+              <windowsSettings>
+                <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+              </windowsSettings>
+            </application>
+          </assembly>
+          '@
+          Set-Content -Path perl-utf8.manifest -Value $manifest -Encoding UTF8
+          $mt = Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter mt.exe -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -match 'x64\\mt\.exe$' } |
+                Select-Object -First 1
+          if (-not $mt) { throw 'mt.exe not found' }
+          & $mt.FullName -manifest perl-utf8.manifest "-outputresource:${perl};1"
+          $acp = (& $perl -MWin32 -e 'print Win32::GetACP()')
+          if ($acp -ne '65001') { throw "GetACP() returned $acp; expected 65001" }
+      - run: perl -V
+      - run: cpanm --installdeps --notest .
+      - run: cpanm --test-only --verbose .
