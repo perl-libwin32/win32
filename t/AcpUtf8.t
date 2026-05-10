@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use Test::More;
+use Encode ();
 use Win32;
 
 # Functions that wrap *A Windows APIs (or convert wide strings via
@@ -14,14 +15,25 @@ use Win32;
 # depends on system locale (a German runner returns German strings, an
 # English one returns English), but the flag invariant is universal.
 
-my $expect_flag = Win32::GetACP() == 65001;
+my $acp = Win32::GetACP();
+my $expect_flag = $acp == 65001;
+
+diag(sprintf "Win32::GetACP() = %d (%s ACP); expecting SvUTF8 flag %s",
+     $acp, $expect_flag ? 'UTF-8' : 'legacy',
+     $expect_flag ? 'ON' : 'OFF');
 
 sub flag_matches {
     my ($label, $val) = @_;
     SKIP: {
         skip "$label returned undef", 1 unless defined $val;
-        is(!!utf8::is_utf8($val), !!$expect_flag,
-           "$label: SvUTF8 matches GetACP() == 65001");
+        my $flagged = utf8::is_utf8($val);
+        my $ok = is(!!$flagged, !!$expect_flag,
+                    "$label: SvUTF8 matches GetACP() == 65001");
+        unless ($ok) {
+            my $bytes = $flagged ? Encode::encode_utf8($val) : $val;
+            diag(sprintf "  value: bytes=%d hex=%s repr=%s",
+                 length($bytes), unpack("H*", $bytes), $val);
+        }
     }
 }
 
