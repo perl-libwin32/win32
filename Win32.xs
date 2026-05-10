@@ -159,7 +159,11 @@ wstr_to_sv(pTHX_ WCHAR *wstr)
     SV *sv = sv_2mortal(newSV(len));
 
     len = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, wstr, wlen, SvPVX(sv), len, NULL, &use_default);
-    if (use_default) {
+    /* When CP_ACP is CP_UTF8 (set via "Use Unicode UTF-8 for worldwide
+     * language support"), every Unicode string round-trips successfully
+     * and use_default never fires, so the result would be UTF-8 bytes
+     * without the SvUTF8 flag. Force the UTF-8 branch in that case. */
+    if (use_default || GetACP() == CP_UTF8) {
         len = WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, NULL, 0, NULL, NULL);
         sv_grow(sv, len);
         len = WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, SvPVX(sv), len, NULL, NULL);
@@ -258,7 +262,11 @@ my_ansipath(const WCHAR *widename)
     New(0, name, len, char);
     WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, widename, widelen,
                         name, len, NULL, &use_default);
-    if (use_default) {
+    /* When CP_ACP is CP_UTF8, the conversion above succeeds for every
+     * Unicode path and use_default never fires, but the result would be
+     * UTF-8 bytes returned through what callers expect to be the ANSI
+     * branch. Fall back to the short (8.3) name in that case. */
+    if (use_default || GetACP() == CP_UTF8) {
         DWORD shortlen = GetShortPathNameW(widename, NULL, 0);
         if (shortlen) {
             WCHAR *shortname;
