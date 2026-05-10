@@ -3,7 +3,9 @@ use Config qw(%Config);
 use Test::More;
 use Win32;
 
-my $fork_emulation = $Config{ccflags} =~ /PERL_IMPLICIT_SYS/;
+# Cygwin builds set useithreads=define but use the OS's real fork(),
+# not the Win32 fork emulation — so gate on $^O as well.
+my $fork_emulation = $^O eq 'MSWin32' && ($Config{useithreads} // '') eq 'define';
 
 plan tests => $fork_emulation ? 4 : 2;
 
