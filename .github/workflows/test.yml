@@ -42,13 +42,16 @@ jobs:
           </assembly>
           '@
           Set-Content -Path perl-utf8.manifest -Value $manifest -Encoding UTF8
+          $before = (& $perl -MWin32 -e 'print Win32::GetACP()')
+          Write-Host "GetACP() before manifest patch: $before"
           $mt = Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter mt.exe -ErrorAction SilentlyContinue |
                 Where-Object { $_.FullName -match 'x64\\mt\.exe$' } |
                 Select-Object -First 1
           if (-not $mt) { throw 'mt.exe not found' }
           & $mt.FullName -manifest perl-utf8.manifest "-outputresource:${perl};1"
-          $acp = (& $perl -MWin32 -e 'print Win32::GetACP()')
-          if ($acp -ne '65001') { throw "GetACP() returned $acp; expected 65001" }
+          $after = (& $perl -MWin32 -e 'print Win32::GetACP()')
+          Write-Host "GetACP() after manifest patch:  $after"
+          if ($after -ne '65001') { throw "GetACP() returned $after; expected 65001" }
       - run: perl -V
       - run: cpanm --installdeps --notest .
       - run: cpanm --test-only --verbose .
