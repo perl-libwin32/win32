@@ -7,6 +7,7 @@ README.md
 Win32.pm
 Win32.xs
 longpath.inc
+t/AcpUtf8.t
 t/CodePage.t
 t/CreateFile.t
 t/ExpandEnvironmentStrings.t
