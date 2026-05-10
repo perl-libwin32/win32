@@ -43,7 +43,7 @@ my ($ok, $message) = HttpGetFileList('nonesuch://example.com', 'NUL:');
 is($ok, "", "'nonesuch://' is not a real protocol");
 SKIP: {
     skip "Cannot verify error on non-English locale setting", 1
-        if $english_locale;
+        unless $english_locale;
 
     is($message, "The URL does not use a recognized protocol\r\n", "correct bad protocol message");
 }
@@ -66,7 +66,7 @@ if ($ENV{PERL_WIN32_INTERNET_OK}) {
     is($LastError - 1e9, '404', 'Correct 404 HTTP status for not found');
     SKIP: {
         skip "Cannot verify error on non-English locale setting", 1
-            if $english_locale;
+            unless $english_locale;
         is($message, 'Not Found', 'Should get text of 404 message');
     }
     # Since all GitHub downloads use redirects, we can test that they work.
