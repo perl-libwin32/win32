@@ -1,5 +1,9 @@
 Revision history for the Perl extension Win32.
 
+0.62    [2026-05-11]
+- revert SvUTF8 flagging in wstr_to_sv and my_ansipath under CP_UTF8 ACP;
+  make t/Unicode.t pass under CP_UTF8 ACP [PR/57]
+
 0.61    [2026-05-10]
 - handle CP_UTF8 system codepage in wstr_to_sv and my_ansipath [PR/53]
 - fix inverted SKIP condition for non-English locale in t/HttpGetFile.t [PR/55]
