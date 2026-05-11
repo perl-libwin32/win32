@@ -33,6 +33,15 @@ my $cwd  = cwd(); # may be a Cygwin path
 my $dir  = "Foo \x{394}\x{419} Bar \x{5E7}\x{645} Baz";
 my $file = "$dir\\xyzzy \x{394}\x{419} plugh \x{5E7}\x{645}";
 
+# When CP_ACP == CP_UTF8 ("Use Unicode UTF-8 for worldwide language
+# support"), Win32::* functions and readdir() return UTF-8 bytes
+# without setting the SvUTF8 flag. Encode the test's flag-on literals
+# down to the same shape so all comparisons stay byte-vs-byte.
+if (Win32::GetACP() == 65001) {
+    utf8::encode($dir);
+    utf8::encode($file);
+}
+
 sub cleanup {
     chdir($home);
     my $ansi = Win32::GetANSIPathName($file);
@@ -56,12 +65,9 @@ ok(-f Win32::GetANSIPathName($file));
 ok(opendir(my $dh, Win32::GetANSIPathName($dir)));
 while ($_ = readdir($dh)) {
     next if /^\./;
-    # On Cygwin 1.7 and on Windows with CP_ACP == CP_UTF8 ("Use Unicode
-    # UTF-8 for worldwide language support"), readdir() returns the
-    # UTF-8 representation of the filename without setting the SvUTF8
-    # bit, so concatenating $_ with a Unicode $dir would corrupt it.
-    Encode::_utf8_on($_) if Win32::GetACP() == 65001
-        || ($^O eq "cygwin" && $Config{osvers} !~ /^1.5/);
+    # On Cygwin 1.7 readdir() returns the utf8 representation of the
+    # filename but doesn't turn on the SvUTF8 bit
+    Encode::_utf8_on($_) if $^O eq "cygwin" && $Config{osvers} !~ /^1.5/;
     is($file, Win32::GetLongPathName("$dir\\$_"));
 }
 closedir($dh);
