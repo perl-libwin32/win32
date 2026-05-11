@@ -56,12 +56,9 @@ ok(-f Win32::GetANSIPathName($file));
 ok(opendir(my $dh, Win32::GetANSIPathName($dir)));
 while ($_ = readdir($dh)) {
     next if /^\./;
-    # On Cygwin 1.7 and on Windows with CP_ACP == CP_UTF8 ("Use Unicode
-    # UTF-8 for worldwide language support"), readdir() returns the
-    # UTF-8 representation of the filename without setting the SvUTF8
-    # bit, so concatenating $_ with a Unicode $dir would corrupt it.
-    Encode::_utf8_on($_) if Win32::GetACP() == 65001
-        || ($^O eq "cygwin" && $Config{osvers} !~ /^1.5/);
+    # On Cygwin 1.7 readdir() returns the utf8 representation of the
+    # filename but doesn't turn on the SvUTF8 bit
+    Encode::_utf8_on($_) if $^O eq "cygwin" && $Config{osvers} !~ /^1.5/;
     is($file, Win32::GetLongPathName("$dir\\$_"));
 }
 closedir($dh);
