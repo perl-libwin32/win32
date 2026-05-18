@@ -9,7 +9,7 @@
 
 - handle CP_UTF8 system codepage in wstr_to_sv and my_ansipath [#53](https://github.com/perl-libwin32/win32/pull/53)
 - fix inverted SKIP condition for non-English locale in t/HttpGetFile.t [#55](https://github.com/perl-libwin32/win32/pull/55)
-- fix t/GetCurrentThreadId.t fork-emulation detection by sisyphus [#45](https://github.com/perl-libwin32/win32/pull/45)
+- fix t/GetCurrentThreadId.t fork-emulation detection by [@sisyphus](https://github.com/sisyphus) [#45](https://github.com/perl-libwin32/win32/pull/45)
 
 ## 0.60 [2026-05-05]
 
@@ -19,18 +19,18 @@
 ## 0.59_02 [2026-05-04]
 
 - detect newer Windows 10/11, Windows Server 2019/2022/2025, and
-  Server SAC releases by Markus Demml [#42](https://github.com/perl-libwin32/win32/pull/42)
-- fix 64-bit registry constant by jkahrman [#37](https://github.com/perl-libwin32/win32/pull/37)
-- follow-up to 64-bit registry fix by Tony Cook [#39](https://github.com/perl-libwin32/win32/pull/39)
+  Server SAC releases by Markus Demml ([@mardem1](https://github.com/mardem1)) [#42](https://github.com/perl-libwin32/win32/pull/42)
+- fix 64-bit registry constant by [@jkahrman](https://github.com/jkahrman) [#37](https://github.com/perl-libwin32/win32/pull/37)
+- follow-up to 64-bit registry fix by Tony Cook ([@tonycoz](https://github.com/tonycoz)) [#39](https://github.com/perl-libwin32/win32/pull/39)
 - fix memory deallocation for WinHttpGetProxyForUrl strings [#49](https://github.com/perl-libwin32/win32/pull/49)
 - include t/HttpGetFile.t in MANIFEST so it ships in the CPAN tarball [#50](https://github.com/perl-libwin32/win32/pull/50)
-- convert tests to Test::More by Graham Knop [#35](https://github.com/perl-libwin32/win32/pull/35)
-- clarify documentation of minor versions by Ferenc Erki [#25](https://github.com/perl-libwin32/win32/pull/25)
+- convert tests to Test::More by Graham Knop ([@haarg](https://github.com/haarg)) [#35](https://github.com/perl-libwin32/win32/pull/35)
+- clarify documentation of minor versions by Ferenc Erki ([@ferki](https://github.com/ferki)) [#25](https://github.com/perl-libwin32/win32/pull/25)
 
 ## 0.59 [2022-05-05]
 
 - add Win32::GetChipArch and use it in Win32::GetOSName to support arm/arm64
-  architecture by Pierrick Bouvier [#34](https://github.com/perl-libwin32/win32/pull/34)
+  architecture by Pierrick Bouvier ([@p-b-o](https://github.com/p-b-o)) [#34](https://github.com/perl-libwin32/win32/pull/34)
 
 ## 0.58 [2022-01-17]
 
@@ -52,20 +52,20 @@
 ## 0.55 [2021-03-07]
 
 - added Win32::IsSymlinkCreationAllowed(), Win32::IsDeveloperModeEnabled(),
-  and Win32::GetProcessPrivileges() by Tomasz Konojacki <me@xenu.pl> [#27](https://github.com/perl-libwin32/win32/pull/27)
+  and Win32::GetProcessPrivileges() by Tomasz Konojacki ([@xenu](https://github.com/xenu)) [#27](https://github.com/perl-libwin32/win32/pull/27)
 - removed old code for versions before Windows 2000
-  by Tomasz Konojacki <me@xenu.pl> [#26](https://github.com/perl-libwin32/win32/pull/26)
+  by Tomasz Konojacki ([@xenu](https://github.com/xenu)) [#26](https://github.com/perl-libwin32/win32/pull/26)
 
 ## 0.54 [2020-03-27]
 
 - Skip tests that rely upon short names if these are unavailable
-  and additional docs about short filenames. Richard Leach [#23](https://github.com/perl-libwin32/win32/pull/23)
+  and additional docs about short filenames. Richard Leach ([@richardleach](https://github.com/richardleach)) [#23](https://github.com/perl-libwin32/win32/pull/23)
 
 ## 0.53 [2019-08-05]
 
 - improve Win32::GetOSDisplayName
 - added Win2016/2019 detection and version information by
-  Richard Leach [#15](https://github.com/perl-libwin32/win32/pull/15)
+  Richard Leach ([@richardleach](https://github.com/richardleach)) [#15](https://github.com/perl-libwin32/win32/pull/15)
 - Include wchar.h to allow building with g++ by Tony Cook [rt#127836]
 
 ## 0.52_02 [2018-11-02] by Reini Urban
@@ -94,8 +94,8 @@
 
 ## 0.50 [2015-01-26]
 
-- add GetOSName support for Windows 8.1 (thanks to Tony Cook) [#6](https://github.com/perl-libwin32/win32/pull/6)
-- Fix build in C++ mode (thanks to Steve Hay and Daniel Dragan) [#7](https://github.com/perl-libwin32/win32/pull/7)
+- add GetOSName support for Windows 8.1 (thanks to Tony Cook ([@tonycoz](https://github.com/tonycoz))) [#6](https://github.com/perl-libwin32/win32/pull/6)
+- Fix build in C++ mode (thanks to Steve Hay ([@steve-m-hay](https://github.com/steve-m-hay)) and Daniel Dragan) [#7](https://github.com/perl-libwin32/win32/pull/7)
 
 ## 0.49 [2014-04-15]
 
