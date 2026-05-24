@@ -8,4 +8,4 @@ on:
 
 jobs:
   test:
-    uses: perl-libwin32/.github/.github/workflows/test.yml@v1
+    uses: perl-libwin32/.github/.github/workflows/test.yml@v2
