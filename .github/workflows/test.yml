@@ -39,6 +39,7 @@ jobs:
           packages: >-
             cygwin-devel
             gcc-core
+            gcc-g++
             make
             w32api-headers
             binutils
