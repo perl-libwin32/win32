@@ -9,3 +9,54 @@ on:
 jobs:
   test:
     uses: perl-libwin32/.github/.github/workflows/test.yml@v2
+
+  # t/HttpGetFile.t fails when perl is built with -DDEBUGGING on Cygwin
+  # (https://github.com/perl-libwin32/win32/issues/62).  The reusable
+  # workflow's cygwin job tests Cygwin's packaged perl, a non-debugging
+  # build, so this job builds perl from source with the Configure flags
+  # perl5 core CI uses.
+  cygwin-debugging:
+    name: Cygwin -DDEBUGGING
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      PERL_VERSION: 5.45.1
+    defaults:
+      run:
+        shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
+    steps:
+      - name: Preserve LF line endings on checkout
+        shell: pwsh
+        run: git config --global core.autocrlf input
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 'Enable 8.3 name creation on D: (the GHA worker volume)'
+        shell: pwsh
+        run: |
+          fsutil 8dot3name set D: 0
+          fsutil 8dot3name query D:
+      - uses: cygwin/cygwin-install-action@711d29f3da23c9f4a1798e369a6f01198c13b11a # v6.1
+        with:
+          packages: >-
+            cygwin-devel
+            gcc-core
+            make
+            w32api-headers
+            binutils
+            libcrypt-devel
+            git
+      - name: Build -DDEBUGGING perl
+        run: |
+          git clone --depth 1 --branch "v$PERL_VERSION" https://github.com/Perl/perl5.git ~/perl5
+          cd ~/perl5
+          ./Configure -des -Dusedevel -Doptimize=-g -DDEBUGGING -Dman1dir=none -Dman3dir=none -Dprefix="$HOME/dbgperl"
+          make -j2
+          make install
+      - name: Build and test Win32
+        run: |
+          cd "$(cygpath --unix "$GITHUB_WORKSPACE")"
+          perl="$HOME/dbgperl/bin/perl$PERL_VERSION"
+          "$perl" -V
+          "$perl" -V | grep --quiet --word-regexp DEBUGGING
+          "$perl" Makefile.PL
+          make
+          make test
