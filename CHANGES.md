@@ -1,5 +1,12 @@
 # Revision history for the Perl extension Win32
 
+## 0.63 [2026-08-09]
+
+- fix Win32::GetLastError() returning 0 after list-context Win32::HttpGetFile()
+  calls on Cygwin -DDEBUGGING builds, diagnosed by [@sisyphus](https://github.com/sisyphus);
+  add a CI job testing against a -DDEBUGGING Cygwin perl [#63](https://github.com/perl-libwin32/win32/pull/63)
+- convert Changes to CHANGES.md and bump release-action to @v2
+
 ## 0.62 [2026-05-11]
 
 - revert SvUTF8 flagging in wstr_to_sv and my_ansipath under CP_UTF8 ACP;
