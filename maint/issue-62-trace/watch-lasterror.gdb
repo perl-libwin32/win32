@@ -15,9 +15,12 @@ run
 python
 import re
 out = gdb.execute("info w32 thread-information-block", to_string=True)
-m = re.search(r"0x[0-9a-fA-F]+", out)
+gdb.write("info w32 thread-information-block:\n" + out + "\n")
+# The first short hex number is the thread id; the TEB address is the
+# first long one.
+m = re.search(r"0x[0-9a-fA-F]{7,}", out)
 if not m:
-    gdb.write("cannot find TEB address in:\n" + out + "\n")
+    gdb.write("cannot find TEB address above\n")
     gdb.execute("quit 2")
 gdb.execute("set $lasterr = (unsigned int *)(" + m.group(0) + " + 0x68)")
 end
