@@ -11,11 +11,23 @@ on:
 
 jobs:
   gdb-trace:
-    name: Watchpoint trace on Cygwin -DDEBUGGING
+    name: Watchpoint trace (${{ matrix.name }})
     runs-on: windows-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: debugging
+            optimize: '-g'
+            debug_flag: '-DDEBUGGING'
+          - name: optimized
+            optimize: '-O2 -g'
+            debug_flag: ''
     env:
       PERL_VERSION: 5.45.1
+      OPTIMIZE: ${{ matrix.optimize }}
+      DEBUG_FLAG: ${{ matrix.debug_flag }}
     defaults:
       run:
         shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
@@ -41,11 +53,12 @@ jobs:
             libcrypt-devel
             git
             gdb
+            cygwin-debuginfo
       - name: Build -DDEBUGGING perl
         run: |
           git clone --depth 1 --branch "v$PERL_VERSION" https://github.com/Perl/perl5.git ~/perl5
           cd ~/perl5
-          ./Configure -des -Dusedevel -Doptimize=-g -DDEBUGGING -Dman1dir=none -Dman3dir=none -Dprefix="$HOME/dbgperl"
+          ./Configure -des -Dusedevel -Doptimize="$OPTIMIZE" $DEBUG_FLAG -Dman1dir=none -Dman3dir=none -Dprefix="$HOME/dbgperl"
           make -j2
           make install
       - name: Build Win32
