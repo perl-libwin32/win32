@@ -16,13 +16,13 @@ python
 import re
 out = gdb.execute("info w32 thread-information-block", to_string=True)
 gdb.write("info w32 thread-information-block:\n" + out + "\n")
-# The first short hex number is the thread id; the TEB address is the
-# first long one.
-m = re.search(r"0x[0-9a-fA-F]{7,}", out)
+# Parse the labeled TEB base address; bare-hex heuristics matched the
+# thread id once and current_seh's zeros another time.
+m = re.search(r"linear_address_tib\s+is\s+(0x[0-9a-fA-F]+)", out)
 if not m:
     gdb.write("cannot find TEB address above\n")
     gdb.execute("quit 2")
-gdb.execute("set $lasterr = (unsigned int *)(" + m.group(0) + " + 0x68)")
+gdb.execute("set $lasterr = (unsigned int *)(" + m.group(1) + " + 0x68)")
 end
 printf "TEB LastErrorValue at %p, value now: %u\n", $lasterr, *$lasterr
 
