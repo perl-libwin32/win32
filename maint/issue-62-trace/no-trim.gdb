@@ -3,6 +3,9 @@
 # the clobber goes through dlfree's sys_trim -> sbrk -> VirtualFree path.
 set pagination off
 set confirm off
+# Win32.dll is loaded at runtime by DynaLoader, so the breakpoint must
+# stay pending until then.
+set breakpoint pending on
 break w32_HttpGetFile
 run
 
