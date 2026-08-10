@@ -34,6 +34,36 @@ commands
   continue
 end
 
+# Entry breakpoints unwind cleanly past the sigfe trampoline, naming the
+# true callers the watchpoint backtraces elide. Active only during bar's
+# window; breakpoint 5 disables them when the window closes.
+break free
+commands
+  silent
+  printf "\n*** free() entered ***\n"
+  bt 6
+  continue
+end
+
+break pthread_getspecific
+commands
+  silent
+  printf "\n*** pthread_getspecific entered ***\n"
+  info args
+  bt 8
+  continue
+end
+
+break w32_GetLastError
+commands
+  silent
+  printf "\n--- window closed (Win32::GetLastError read) ---\n"
+  disable 3
+  disable 4
+  disable 5
+  continue
+end
+
 commands 1
   silent
   printf "\n--- list-context SetLastError site reached again ---\n"
