@@ -1,0 +1,82 @@
+name: issue-62-gdb-trace
+
+# Temporary experiment for issue #62's residual bar-style clobber: find
+# which Windows call zeroes the TEB's LastErrorValue during the one
+# libc free() in bar's window. Lives only on this branch; not for merge.
+
+on:
+  push:
+    branches: [issue-62-gdb-trace]
+  workflow_dispatch:
+
+jobs:
+  gdb-trace:
+    name: Watchpoint trace (${{ matrix.name }})
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: debugging
+            optimize: '-g'
+            debug_flag: '-DDEBUGGING'
+          - name: optimized
+            optimize: '-O2 -g'
+            debug_flag: ''
+    env:
+      PERL_VERSION: 5.45.1
+      OPTIMIZE: ${{ matrix.optimize }}
+      DEBUG_FLAG: ${{ matrix.debug_flag }}
+    defaults:
+      run:
+        shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
+    steps:
+      - name: Preserve LF line endings on checkout
+        shell: pwsh
+        run: git config --global core.autocrlf input
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 'Enable 8.3 name creation on D: (the GHA worker volume)'
+        shell: pwsh
+        run: |
+          fsutil 8dot3name set D: 0
+          fsutil 8dot3name query D:
+      - uses: cygwin/cygwin-install-action@711d29f3da23c9f4a1798e369a6f01198c13b11a # v6.1
+        with:
+          packages: >-
+            cygwin-devel
+            gcc-core
+            gcc-g++
+            make
+            w32api-headers
+            binutils
+            libcrypt-devel
+            git
+            gdb
+            cygwin-debuginfo
+      - name: Build -DDEBUGGING perl
+        run: |
+          git clone --depth 1 --branch "v$PERL_VERSION" https://github.com/Perl/perl5.git ~/perl5
+          cd ~/perl5
+          ./Configure -des -Dusedevel -Doptimize="$OPTIMIZE" $DEBUG_FLAG -Dman1dir=none -Dman3dir=none -Dprefix="$HOME/dbgperl"
+          make -j2
+          make install
+      - name: Build Win32
+        run: |
+          cd "$(cygpath --unix "$GITHUB_WORKSPACE")"
+          "$HOME/dbgperl/bin/perl$PERL_VERSION" Makefile.PL
+          make
+      - name: Baseline run of bug.p
+        run: |
+          cd "$(cygpath --unix "$GITHUB_WORKSPACE")"
+          "$HOME/dbgperl/bin/perl$PERL_VERSION" -Mblib maint/issue-62-trace/bug.p
+      - name: Watchpoint trace
+        run: |
+          cd "$(cygpath --unix "$GITHUB_WORKSPACE")"
+          gdb --batch --command=maint/issue-62-trace/watch-lasterror.gdb \
+              --args "$HOME/dbgperl/bin/perl$PERL_VERSION" -Mblib maint/issue-62-trace/bug.p
+      - name: Control run with malloc trim disabled
+        run: |
+          cd "$(cygpath --unix "$GITHUB_WORKSPACE")"
+          gdb --batch --command=maint/issue-62-trace/no-trim.gdb \
+              --args "$HOME/dbgperl/bin/perl$PERL_VERSION" -Mblib maint/issue-62-trace/bug.p
